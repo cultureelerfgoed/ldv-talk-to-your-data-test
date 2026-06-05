@@ -13,6 +13,7 @@ import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+import os
 import config
 from answer import answer_generator
 from sparql import executor as sparql_executor
@@ -25,7 +26,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_folder=os.path.join(os.path.dirname(__file__), "frontend"),
+    static_url_path="",
+)
 CORS(app)
 
 
@@ -85,6 +90,12 @@ def generate_answer():
     except Exception as e:
         logger.exception("Fout bij antwoord generatie")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/")
+def index():
+    """Serveer de frontend."""
+    return app.send_static_file("index.html")
 
 
 @app.route("/api/health", methods=["GET"])

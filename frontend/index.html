@@ -148,7 +148,7 @@
   <div id="results" class="results"></div>
 </div>
 <script>
-const API = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : 'https://ldv-talk-to-your-data-test.onrender.com/api';
+const API = window.location.origin + '/api';
 let lastBindings = [], lastVars = [], lastQuestion = '';
 
 (async () => {
