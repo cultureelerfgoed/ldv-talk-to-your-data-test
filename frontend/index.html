@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCE Erfgoed Assistent</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #1a1612; --paper: #f5f0e8; --paper2: #ece6d8;
+    --accent: #8b3a1e; --accent2: #c4581f; --gold: #b8962e;
+    --muted: #7a7060; --border: #c8bfaa; --code-bg: #2a2420;
+    --code-fg: #e8d5b0; --success: #2d6a4f; --radius: 4px;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; display: flex; flex-direction: column; }
+  header { border-bottom: 1px solid var(--border); padding: 1.25rem 2rem; display: flex; align-items: center; gap: 1rem; background: var(--paper); }
+  .logo-mark { width: 36px; height: 36px; background: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logo-mark svg { width: 20px; height: 20px; fill: none; stroke: var(--paper); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .header-text h1 { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 600; color: var(--ink); }
+  .header-text p { font-size: 0.72rem; color: var(--muted); font-weight: 300; letter-spacing: 0.05em; text-transform: uppercase; }
+  .main { flex: 1; max-width: 860px; width: 100%; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+  .intro { margin-bottom: 2rem; }
+  .intro h2 { font-family: 'Playfair Display', serif; font-size: 1.7rem; font-weight: 400; line-height: 1.3; margin-bottom: 0.5rem; }
+  .intro h2 em { font-style: italic; color: var(--accent); }
+  .intro p { font-size: 0.875rem; color: var(--muted); line-height: 1.6; max-width: 580px; }
+  .examples { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.75rem; }
+  .examples-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 500; width: 100%; margin-bottom: 0.25rem; }
+  .example-pill { background: none; border: 1px solid var(--border); border-radius: 2px; padding: 0.35rem 0.75rem; font-size: 0.8rem; color: var(--ink); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; text-align: left; }
+  .example-pill:hover { background: var(--paper2); border-color: var(--accent); color: var(--accent); }
+  .input-area { position: relative; margin-bottom: 1.5rem; }
+  .question-input { width: 100%; padding: 0.9rem 7rem 0.9rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 0.95rem; background: white; color: var(--ink); outline: none; transition: border-color 0.15s; resize: none; min-height: 56px; }
+  .question-input:focus { border-color: var(--accent); }
+  .question-input::placeholder { color: var(--border); }
+  .ask-btn { position: absolute; right: 0.5rem; bottom: 0.5rem; background: var(--accent); color: var(--paper); border: none; padding: 0.45rem 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 500; cursor: pointer; border-radius: 2px; transition: background 0.15s; display: flex; align-items: center; gap: 0.4rem; }
+  .ask-btn:hover { background: var(--accent2); }
+  .ask-btn:disabled { background: var(--muted); cursor: not-allowed; }
+  .results { display: flex; flex-direction: column; gap: 1.25rem; }
+  .panel { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: white; }
+  .panel-header { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 1rem; background: var(--paper2); border-bottom: 1px solid var(--border); font-size: 0.7rem; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+  .panel-header .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .panel-header .dot.gold { background: var(--gold); }
+  .panel-header .dot.green { background: var(--success); }
+  .row-count { font-family: 'DM Mono', monospace; font-size: 0.72rem; background: var(--paper); padding: 0.1rem 0.4rem; border-radius: 2px; color: var(--muted); margin-left: auto; }
+  .sparql-block { background: var(--code-bg); border-radius: var(--radius); padding: 1rem 1.25rem; overflow-x: auto; position: relative; }
+  .sparql-block pre { font-family: 'DM Mono', monospace; font-size: 0.78rem; line-height: 1.65; color: var(--code-fg); white-space: pre-wrap; word-break: break-all; }
+  .kw { color: #e09b4e; } .prefix { color: #88c0a0; } .var { color: #7cb8e8; } .str { color: #c8a96e; } .comment { color: #6a6055; font-style: italic; }
+  .copy-btn { position: absolute; top: 0.6rem; right: 0.6rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #a09888; font-size: 0.68rem; font-family: 'DM Mono', monospace; padding: 0.2rem 0.5rem; cursor: pointer; border-radius: 2px; }
+  .copy-btn:hover { background: rgba(255,255,255,0.14); color: var(--code-fg); }
+  .results-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .results-table th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); font-weight: 500; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: var(--paper); }
+  .results-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--paper2); color: var(--ink); line-height: 1.4; }
+  .results-table tr:last-child td { border-bottom: none; }
+  .results-table tr:hover td { background: var(--paper); }
+  .results-table td a { color: var(--accent); text-decoration: none; font-family: 'DM Mono', monospace; font-size: 0.75rem; }
+  .answer-text { font-size: 0.925rem; line-height: 1.7; color: var(--ink); }
+  .answer-text strong { font-weight: 500; color: var(--accent); }
+  .status-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1.25rem; font-size: 0.8rem; color: var(--muted); }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .step-indicator { font-size: 0.68rem; font-family: 'DM Mono', monospace; background: var(--paper2); padding: 0.15rem 0.4rem; border-radius: 2px; color: var(--accent); }
+  .error-box { background: #fff5f2; border: 1px solid #f4c9bb; border-radius: var(--radius); padding: 0.9rem 1.1rem; font-size: 0.82rem; color: #8b3a1e; line-height: 1.5; margin: 1rem; }
+  .meta-bar { display: flex; align-items: center; gap: 1rem; font-size: 0.72rem; color: var(--muted); padding: 0.6rem 1.25rem; border-top: 1px solid var(--paper2); font-family: 'DM Mono', monospace; background: var(--paper); }
+  .mode-toggle {
+    display: flex;
+    gap: 0;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    width: fit-content;
+  }
+  .mode-toggle label {
+    padding: 0.4rem 1rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--muted);
+    background: var(--paper);
+    transition: all 0.15s;
+    user-select: none;
+    border-right: 1px solid var(--border);
+  }
+  .mode-toggle label:last-child { border-right: none; }
+  .mode-toggle input[type=radio] { display: none; }
+  .mode-toggle input[type=radio]:checked + label {
+    background: var(--accent);
+    color: var(--paper);
+  }
+  .row-uncertain td { background: #fffbf0 !important; }
+  .row-uncertain td:first-child { border-left: 3px solid var(--gold); }
+  .uncertain-badge {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    font-size: 0.68rem; background: #fef3c7; color: #92400e;
+    border: 1px solid #fcd34d; border-radius: 2px;
+    padding: 0.1rem 0.35rem; font-family: 'DM Mono', monospace;
+  }
+  .export-btn { margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 2px; padding: 0.25rem 0.65rem; font-size: 0.72rem; font-family: 'DM Mono', monospace; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 0.3rem; transition: all 0.15s; }
+  .export-btn:hover { border-color: var(--success); color: var(--success); }
+  .endpoint-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--muted); background: var(--paper2); border: 1px solid var(--border); padding: 0.25rem 0.6rem; border-radius: 2px; margin-bottom: 1.5rem; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #aaa; display: inline-block; transition: background 0.3s; }
+  .status-dot.ok { background: var(--success); }
+  .status-dot.err { background: var(--accent); }
+  .panel-body { padding: 1rem 1.25rem; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-mark">
+    <svg viewBox="0 0 24 24"><polygon points="12,2 22,19 2,19"/><line x1="12" y1="8" x2="12" y2="14"/></svg>
+  </div>
+  <div class="header-text">
+    <h1>Erfgoed Assistent</h1>
+    <p>Rijksdienst voor het Cultureel Erfgoed &middot; CEO Ontologie</p>
+  </div>
+</header>
+<div class="main">
+  <div class="intro">
+    <h2>Stel een vraag over <em>cultureel erfgoed</em></h2>
+    <p>Typ een vraag in gewone taal. De assistent vertaalt dit naar SPARQL, bevraagt de RCE linked data, en geeft een leesbaar antwoord.</p>
+  </div>
+  <div class="endpoint-badge">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">verbinding testen&hellip;</span>
+  </div>
+  <div class="examples">
+    <div class="examples-label">Voorbeeldvragen</div>
+    <button class="example-pill" onclick="setQuestion(this.textContent)">Hoeveel rijksmonumenten zijn er in Utrecht?</button>
+    <button class="example-pill" onclick="setQuestion(this.textContent)">Geef 5 rijksmonumenten in Amsterdam met naam en adres</button>
+    <button class="example-pill" onclick="setQuestion(this.textContent)">Welke monumenten in Bunnik zijn een kerk?</button>
+    <button class="example-pill" onclick="setQuestion(this.textContent)">Welke rijksmonumenten zijn van het type kasteel?</button>
+    <button class="example-pill" onclick="setQuestion(this.textContent)">Geef 10 rijksmonumenten met omschrijving in Den Haag</button>
+    <button class="example-pill" onclick="setQuestion(this.textContent)">Hoeveel rijksmonumenten per provincie?</button>
+  </div>
+  <div class="mode-toggle">
+    <input type="radio" name="mode" id="modeLijst" value="lijst" checked>
+    <label for="modeLijst">&#9776; Lijst</label>
+    <input type="radio" name="mode" id="modeTelling" value="telling">
+    <label for="modeTelling">&#35; Telling</label>
+  </div>
+  <div class="input-area">
+    <textarea id="question" class="question-input" placeholder="Bijv: Welke rijksmonumenten staan er in Zeist?" rows="2"></textarea>
+    <button class="ask-btn" id="askBtn" onclick="ask()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Vraag stellen
+    </button>
+  </div>
+  <div id="results" class="results"></div>
+</div>
+<script>
+const API = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : 'https://ldv-talk-to-your-data-test.onrender.com/api';
+let lastBindings = [], lastVars = [], lastQuestion = '';
+
+(async () => {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  try {
+    const r = await fetch(API + '/health');
+    const d = await r.json();
+    if (d.status === 'ok') {
+      dot.className = 'status-dot ok';
+      txt.textContent = d.api_key_set ? 'backend actief \u00b7 api key gevonden' : 'backend actief \u00b7 \u26a0 geen api key ingesteld';
+    }
+  } catch(e) {
+    dot.className = 'status-dot err';
+    txt.textContent = 'backend niet bereikbaar \u2014 draait app.py?';
+  }
+})();
+
+function exportCSV() {
+  if (!lastBindings.length) return;
+  var BOM = '\uFEFF';
+  var sep = ';';
+  var lines = [lastVars.join(sep)];
+  for (var i = 0; i < lastBindings.length; i++) {
+    var row = lastBindings[i];
+    var cells = [];
+    for (var j = 0; j < lastVars.length; j++) {
+      var val = row[lastVars[j]] ? row[lastVars[j]].value : '';
+      val = val.replace(/"/g, '""');
+      if (val.indexOf(sep) >= 0 || val.indexOf('\n') >= 0) {
+        val = '"' + val + '"';
+      }
+      cells.push(val);
+    }
+    lines.push(cells.join(sep));
+  }
+  var csv = BOM + lines.join('\n');
+  var blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var fname = 'erfgoed_' + lastQuestion.slice(0, 30).replace(/[^a-zA-Z0-9]/g, '_') + '.csv';
+  a.href = url;
+  a.download = fname;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function setQuestion(text) {
+  document.getElementById('question').value = text;
+  document.getElementById('question').focus();
+}
+
+function renderSparql(q) {
+  var e = q.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  e = e.replace(/\b(SELECT|WHERE|FILTER|OPTIONAL|GROUP BY|ORDER BY|LIMIT|OFFSET|DISTINCT|COUNT|AS|PREFIX|FROM|HAVING|ASC|DESC|BIND|VALUES|UNION|MINUS|EXISTS|NOT|IN|LANG|STR|REGEX|CONCAT|COALESCE|BOUND|IF|ISIRI|ISBLANK|ISLITERAL|ISNUMERIC|DATATYPE|LANGMATCHES|SAMETERM|SAMPLE|MIN|MAX|SUM|AVG)\b/g, '<span class="kw">$1</span>');
+  e = e.replace(/(PREFIX\s+[\w-]+:)/g, '<span class="prefix">$1</span>');
+  e = e.replace(/(\?\w+)/g, '<span class="var">$1</span>');
+  e = e.replace(/"([^"]*)"/g, '<span class="str">"$1"</span>');
+  e = e.replace(/(#.*$)/gm, '<span class="comment">$1</span>');
+  return e;
+}
+
+function formatValue(val) {
+  if (!val) return '\u2014';
+  var v = val.value;
+  if (v === 'omschrijving (onzeker)') {
+    return '<span class="uncertain-badge">\u26a0 omschrijving (onzeker)</span>';
+  }
+  if (v.indexOf('http') === 0) {
+    var parts = v.split('/');
+    var short = parts[parts.length - 1].split('#').pop() || v;
+    return '<a href="' + v + '" target="_blank" title="' + v + '">' + short + '</a>';
+  }
+  return v.length > 140 ? v.slice(0, 140) + '\u2026' : v;
+}
+
+function addLoading(container, text, step) {
+  var inner = container.querySelector('.panel-body') || container;
+  inner.innerHTML = '<div class="status-row"><div class="spinner"></div>' +
+    (step ? '<span class="step-indicator">' + step + '</span>' : '') +
+    '<span>' + text + '</span></div>';
+}
+
+async function postJSON(path, body) {
+  var r = await fetch(API + path, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  var d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+  return d;
+}
+
+async function ask() {
+  var q = document.getElementById('question').value.trim();
+  if (!q) return;
+  var btn = document.getElementById('askBtn');
+  btn.disabled = true;
+  var resultsDiv = document.getElementById('results');
+  resultsDiv.innerHTML = '';
+  var t0 = Date.now();
+
+  var p1 = document.createElement('div');
+  p1.className = 'panel';
+  p1.innerHTML = '<div class="panel-header"><div class="dot"></div>SPARQL genereren</div><div class="panel-body"></div>';
+  addLoading(p1, 'Vraag vertalen naar SPARQL via Claude\u2026', 'stap 1/3');
+  resultsDiv.appendChild(p1);
+
+  var sparqlQuery = '';
+  try {
+    var modeEl = document.querySelector('input[name=mode]:checked');
+  var mode = modeEl ? modeEl.value : 'lijst';
+    var d1 = await postJSON('/generate-sparql', {question: q, mode: mode});
+    sparqlQuery = d1.query;
+    p1.innerHTML = '<div class="panel-header"><div class="dot"></div>Gegenereerde SPARQL</div>' +
+      '<div class="panel-body" style="padding:0"><div class="sparql-block">' +
+      '<button class="copy-btn" onclick="navigator.clipboard.writeText(this.nextElementSibling.textContent)">kopi\u00ebren</button>' +
+      '<pre>' + renderSparql(sparqlQuery) + '</pre></div></div>';
+  } catch(e) {
+    p1.innerHTML += '<div class="error-box">Fout bij SPARQL generatie: ' + e.message + '</div>';
+    btn.disabled = false; return;
+  }
+
+  var p2 = document.createElement('div');
+  p2.className = 'panel';
+  p2.innerHTML = '<div class="panel-header"><div class="dot gold"></div>Endpoint bevragen</div><div class="panel-body"></div>';
+  addLoading(p2, 'Query uitvoeren op RCE SPARQL endpoint\u2026', 'stap 2/3');
+  resultsDiv.appendChild(p2);
+
+  var sparqlResults = null;
+  try {
+    sparqlResults = await postJSON('/execute-sparql', {query: sparqlQuery});
+    var bindings = (sparqlResults.results && sparqlResults.results.bindings) ? sparqlResults.results.bindings : [];
+    var vars = (sparqlResults.head && sparqlResults.head.vars) ? sparqlResults.head.vars : [];
+    var elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+
+    lastBindings = bindings;
+    lastVars = vars;
+    lastQuestion = q;
+
+    if (bindings.length === 0) {
+      p2.innerHTML = '<div class="panel-header"><div class="dot gold"></div>Resultaten</div>' +
+        '<div class="panel-body"><p style="color:var(--muted);font-size:0.85rem">Geen resultaten gevonden.</p></div>';
+    } else {
+      var thead = '<tr>' + vars.map(function(v) { return '<th>' + v + '</th>'; }).join('') + '</tr>';
+      var tbody = bindings.slice(0, 50).map(function(row) {
+        var bronVal = row['bron'] ? row['bron'].value : '';
+        var rowClass = bronVal === 'omschrijving (onzeker)' ? ' class="row-uncertain"' : '';
+        return '<tr' + rowClass + '>' + vars.map(function(v) { return '<td>' + formatValue(row[v]) + '</td>'; }).join('') + '</tr>';
+      }).join('');
+      p2.innerHTML = '<div class="panel-header"><div class="dot gold"></div>Resultaten' +
+        '<span class="row-count">' + bindings.length + ' rij' + (bindings.length !== 1 ? 'en' : '') + '</span></div>' +
+        '<div style="overflow-x:auto"><table class="results-table"><thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>' +
+        '<div class="meta-bar"><span>\u23f1 ' + elapsed + 's</span>' +
+        (bindings.length > 50 ? '<span>eerste 50 van ' + bindings.length + ' getoond</span>' : '') +
+        '<button class="export-btn" onclick="exportCSV()">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+        ' Exporteer CSV</button></div>';
+    }
+  } catch(e) {
+    p2.innerHTML += '<div class="error-box">Fout bij endpoint: ' + e.message + '</div>';
+    btn.disabled = false; return;
+  }
+
+  var p3 = document.createElement('div');
+  p3.className = 'panel';
+  p3.innerHTML = '<div class="panel-header"><div class="dot green"></div>Antwoord formuleren</div><div class="panel-body"></div>';
+  addLoading(p3, 'Resultaten omzetten naar leesbaar antwoord\u2026', 'stap 3/3');
+  resultsDiv.appendChild(p3);
+
+  try {
+    var total = lastBindings.length;
+    var d3 = await postJSON('/generate-answer', {question: q, results: sparqlResults, total: total});
+    p3.innerHTML = '<div class="panel-header"><div class="dot green"></div>Antwoord</div>' +
+      '<div class="panel-body"><p class="answer-text">' + d3.answer.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') + '</p></div>';
+  } catch(e) {
+    p3.innerHTML += '<div class="error-box">Fout bij antwoord: ' + e.message + '</div>';
+  }
+
+  btn.disabled = false;
+}
+
+document.getElementById('question').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(); }
+});
+</script>
+</body>
+</html>

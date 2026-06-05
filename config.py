@@ -20,12 +20,18 @@ def _require(key: str) -> str:
     return value
 
 
-ANTHROPIC_API_KEY = _require("ANTHROPIC_API_KEY")
+# LLM provider: 'anthropic' of 'google'
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "google")
+
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+
 SPARQL_ENDPOINT = os.getenv(
     "SPARQL_ENDPOINT",
     "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql",
 )
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-1.5-pro")
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5000"))
 FLASK_DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 

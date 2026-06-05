@@ -105,7 +105,9 @@ def health():
 
 
 if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", config.FLASK_PORT))
     logger.info("SPARQL endpoint: %s", config.SPARQL_ENDPOINT)
     logger.info("Model: %s", config.ANTHROPIC_MODEL)
-    logger.info("Server start op http://localhost:%d", config.FLASK_PORT)
-    app.run(debug=config.FLASK_DEBUG, port=config.FLASK_PORT)
+    logger.info("Server start op poort %d", port)
+    app.run(host="0.0.0.0", debug=config.FLASK_DEBUG, port=port)
