@@ -38,6 +38,36 @@ WHERE {
 GROUP BY ?provURI
 ORDER BY DESC(?aantal)
 
+ARCHEOLOGISCHE OBJECTEN — gebruik deze klassen naast ceo:Rijksmonument:
+
+ceo:ArcheologischTerrein — archeologische terreinen
+  ceo:archis2Monumentnummer ?archisNummer .
+  ceo:cultuurhistorischObjectnummer ?objectnummer .
+  ceo:heeftArcheologischeWaardering ?waarderingURI .
+  ceo:bevatObject ?complex .
+  ceo:heeftBasisregistratieRelatie ?brr .
+  ceo:heeftOmschrijving ?omschrObj . ?omschrObj ceo:omschrijving ?tekst .
+
+ceo:Vondstlocatie — vindplaatsen
+  ceo:archis2Vondstmeldingsnummer ?meldingsnummer .
+  ceo:archis2Waarnemingsnummer ?waarnemingsnummer .
+  ceo:bevatObject ?object .
+
+ceo:ArcheologischOnderzoeksgebied — onderzoeksgebieden
+  ceo:cultuurhistorischObjectnummer ?objectnummer .
+  ceo:registratiedatum ?datum .
+  ceo:heeftBasisregistratieRelatie ?brr .
+
+ceo:ArcheologischComplex — complexen
+  ceo:archis2Complexnummer ?complexnummer .
+  ceo:cultuurhistorischObjectnummer ?objectnummer .
+
+ceo:Grondsporen — grondsporen
+  ceo:aantalGrondsporen ?aantal .
+
+ceo:Vondsten — vondsten
+  ceo:aantalVondsten ?aantal .
+
 ZOEKEN OP FUNCTIE/TYPE bij tellingen — gebruik UNION, zoek NIET in ceo:omschrijving:
 SELECT (COUNT(DISTINCT ?rm) AS ?aantal)
 WHERE {

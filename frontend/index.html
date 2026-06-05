@@ -117,7 +117,7 @@
 <div class="main">
   <div class="intro">
     <h2>Stel een vraag over <em>cultureel erfgoed</em></h2>
-    <p>Typ een vraag in gewone taal. De assistent vertaalt dit naar SPARQL, bevraagt de RCE linked data, en geeft een leesbaar antwoord.</p>
+    <p>Typ een vraag in gewone taal. De app vertaalt dit naar SPARQL (de zoektaal voor linked data), bevraagt de <a href="https://linkeddata.cultureelerfgoed.nl/rce/cho" target="_blank">RCE linked data</a>, en geeft een leesbaar antwoord. De app is nadrukkelijk bedoeld als test en kan incorrecte antwoorden geven.</p>
   </div>
   <div class="endpoint-badge">
     <span class="status-dot" id="statusDot"></span>
@@ -131,6 +131,8 @@
     <button class="example-pill" onclick="setQuestion(this.textContent)">Welke rijksmonumenten zijn van het type kasteel?</button>
     <button class="example-pill" onclick="setQuestion(this.textContent)">Geef 10 rijksmonumenten met omschrijving in Den Haag</button>
     <button class="example-pill" onclick="setQuestion(this.textContent)">Hoeveel rijksmonumenten per provincie?</button>
+    <button class="example-pill" onclick="setQuestion(this.textContent)">Welke vondstlocaties hebben de meeste vondsten?</button>
+    <button class="example-pill" onclick="setQuestion(this.textContent)">Hoeveel archeologische terreinen zijn er in Nederland?</button>
   </div>
   <div class="mode-toggle">
     <input type="radio" name="mode" id="modeLijst" value="lijst" checked>
