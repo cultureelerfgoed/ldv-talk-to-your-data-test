@@ -1,0 +1,85 @@
+"""
+Configuratie — laadt .env en exporteert alle constanten.
+Kopieer .env.example naar .env en vul je waarden in.
+"""
+
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent / ".env")
+
+
+def _require(key: str) -> str:
+    value = os.getenv(key)
+    if not value:
+        raise EnvironmentError(
+            f"Omgevingsvariabele '{key}' is niet ingesteld. "
+            f"Kopieer .env.example naar .env en vul hem in."
+        )
+    return value
+
+
+ANTHROPIC_API_KEY = _require("ANTHROPIC_API_KEY")
+SPARQL_ENDPOINT = os.getenv(
+    "SPARQL_ENDPOINT",
+    "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql",
+)
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+FLASK_PORT = int(os.getenv("FLASK_PORT", "5000"))
+FLASK_DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+
+SPARQL_PREFIXES = """\
+PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"""
+
+# Exacte provincie URIs uit de OWMS thesaurus
+# Alle gangbare spelwijzen mappen naar één URI per provincie
+_BASE = "http://standaarden.overheid.nl/owms/terms/"
+# Omgekeerde mapping: URI → leesbare naam
+PROVINCIE_NAAM = {
+    "http://standaarden.overheid.nl/owms/terms/Drenthe":              "Drenthe",
+    "http://standaarden.overheid.nl/owms/terms/Flevoland":            "Flevoland",
+    "http://standaarden.overheid.nl/owms/terms/Fryslan":              "Fryslân",
+    "http://standaarden.overheid.nl/owms/terms/Gelderland":           "Gelderland",
+    "http://standaarden.overheid.nl/owms/terms/Groningen_(provincie)":"Groningen",
+    "http://standaarden.overheid.nl/owms/terms/Limburg":              "Limburg",
+    "http://standaarden.overheid.nl/owms/terms/Noord-Brabant":        "Noord-Brabant",
+    "http://standaarden.overheid.nl/owms/terms/Noord-Holland":        "Noord-Holland",
+    "http://standaarden.overheid.nl/owms/terms/Overijssel":           "Overijssel",
+    "http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)":  "Utrecht",
+    "http://standaarden.overheid.nl/owms/terms/Zeeland":              "Zeeland",
+    "http://standaarden.overheid.nl/owms/terms/Zuid-Holland":         "Zuid-Holland",
+}
+
+PROVINCIE_URI = {
+    "drenthe":              _BASE + "Drenthe",
+    "flevoland":            _BASE + "Flevoland",
+    "friesland":            _BASE + "Fryslan",
+    "fryslan":              _BASE + "Fryslan",
+    "fryslân":              _BASE + "Fryslan",
+    "frysland":             _BASE + "Fryslan",
+    "gelderland":           _BASE + "Gelderland",
+    "groningen":            _BASE + "Groningen_(provincie)",
+    "provincie groningen":  _BASE + "Groningen_(provincie)",
+    "limburg":              _BASE + "Limburg",
+    "noord-brabant":        _BASE + "Noord-Brabant",
+    "noord brabant":        _BASE + "Noord-Brabant",
+    "noordbrabant":         _BASE + "Noord-Brabant",
+    "n-brabant":            _BASE + "Noord-Brabant",
+    "brabant":              _BASE + "Noord-Brabant",
+    "noord-holland":        _BASE + "Noord-Holland",
+    "noord holland":        _BASE + "Noord-Holland",
+    "noordholland":         _BASE + "Noord-Holland",
+    "n-holland":            _BASE + "Noord-Holland",
+    "overijssel":           _BASE + "Overijssel",
+    "utrecht":              _BASE + "Utrecht_(provincie)",
+    "provincie utrecht":    _BASE + "Utrecht_(provincie)",
+    "zeeland":              _BASE + "Zeeland",
+    "zuid-holland":         _BASE + "Zuid-Holland",
+    "zuid holland":         _BASE + "Zuid-Holland",
+    "zuidholland":          _BASE + "Zuid-Holland",
+    "z-holland":            _BASE + "Zuid-Holland",
+}
