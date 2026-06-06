@@ -9,6 +9,11 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
 
+# LLM provider: 'anthropic', 'google' of 'ollama'
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
+# Ollama
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:14b")
 
 def _require(key: str) -> str:
     value = os.getenv(key)
@@ -20,8 +25,6 @@ def _require(key: str) -> str:
     return value
 
 
-# LLM provider: 'anthropic' of 'google'
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "google")
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
