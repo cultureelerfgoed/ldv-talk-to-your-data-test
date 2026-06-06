@@ -679,6 +679,55 @@
     word-break: break-word;
   }
 
+  .sparql-editor-wrap {
+    background: var(--code-bg);
+    position: relative;
+  }
+
+  .sparql-editor {
+    width: 100%;
+    min-height: 260px;
+    resize: vertical;
+    border: none;
+    outline: none;
+    background: var(--code-bg);
+    color: var(--code-fg);
+    font-family: "DM Mono", monospace;
+    font-size: 0.76rem;
+    line-height: 1.65;
+    padding: 1rem;
+    tab-size: 2;
+  }
+
+  .sparql-editor:focus {
+    box-shadow: inset 0 0 0 2px rgba(224, 155, 78, 0.35);
+  }
+
+  .sparql-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    padding: 0.7rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .sparql-action-btn {
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: #d6c6aa;
+    border-radius: 4px;
+    padding: 0.35rem 0.65rem;
+    cursor: pointer;
+    font-family: "DM Mono", monospace;
+    font-size: 0.68rem;
+  }
+
+  .sparql-action-btn:hover {
+    color: var(--code-fg);
+    background: rgba(255, 255, 255, 0.14);
+  }
+
   .kw { color: #e09b4e; }
   .prefix { color: #88c0a0; }
   .var { color: #7cb8e8; }
@@ -1044,6 +1093,7 @@ let lastBindings = [];
 let lastVars = [];
 let lastQuestion = '';
 let lastMode = 'lijst';
+let currentSparqlQuery = '';
 
 const state = {
   provider: '',
@@ -1191,15 +1241,92 @@ function renderSparql(query) {
 }
 
 function renderSparqlDetails(query) {
+  currentSparqlQuery = query;
+
   return `
-    <details class="sparql-details">
-      <summary>Gegenereerde SPARQL-query</summary>
-      <div class="sparql-block">
-        <button class="copy-btn" onclick="copySparql(this)">kopiëren</button>
-        <pre>${renderSparql(query)}</pre>
+    <details class="sparql-details" open>
+      <summary>Bewerkbare SPARQL-query</summary>
+      <div class="sparql-editor-wrap">
+        <textarea id="sparqlEditor" class="sparql-editor" spellcheck="false">${escapeHTML(query)}</textarea>
+        <div class="sparql-actions">
+          <button class="sparql-action-btn" onclick="copyEditedSparql()">kopiëren</button>
+          <button class="sparql-action-btn" onclick="resetSparqlEditor()">herstel gegenereerde query</button>
+          <button class="sparql-action-btn" onclick="runEditedSparql()">voer bewerkte query uit</button>
+        </div>
       </div>
     </details>
   `;
+}
+
+function getEditedSparql() {
+  const editor = document.getElementById('sparqlEditor');
+  return editor ? editor.value.trim() : currentSparqlQuery;
+}
+
+function copyEditedSparql() {
+  const query = getEditedSparql();
+
+  navigator.clipboard.writeText(query).then(() => {
+    const buttons = document.querySelectorAll('.sparql-action-btn');
+    if (!buttons.length) return;
+
+    const button = buttons[0];
+    const old = button.textContent;
+    button.textContent = 'gekopieerd';
+
+    setTimeout(() => {
+      button.textContent = old;
+    }, 1300);
+  });
+}
+
+function resetSparqlEditor() {
+  const editor = document.getElementById('sparqlEditor');
+  if (editor) editor.value = currentSparqlQuery;
+}
+
+async function runEditedSparql() {
+  const query = getEditedSparql();
+  const content = document.getElementById('contentStack');
+
+  if (!query || !content) return;
+
+  const existingResults = document.getElementById('manualResultsCard');
+  if (existingResults) existingResults.remove();
+
+  const t0 = Date.now();
+
+  content.insertAdjacentHTML('beforeend', `
+    <div class="card" id="manualResultsCard">
+      <div class="card-header">
+        <span class="card-dot gold"></span>
+        <h4>Bewerkte query uitvoeren</h4>
+      </div>
+      <div class="status-row">
+        <span class="spinner"></span>
+        <span>Query uitvoeren op het RCE SPARQL endpoint…</span>
+      </div>
+    </div>
+  `);
+
+  try {
+    const sparqlResults = await postJSON('/execute-sparql', {query: query});
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+
+    const card = document.getElementById('manualResultsCard');
+    if (card) {
+      card.outerHTML = `
+        <div id="manualResultsCard">
+          ${renderResultsCard(sparqlResults, elapsed)}
+        </div>
+      `;
+    }
+  } catch(e) {
+    const card = document.getElementById('manualResultsCard');
+    if (card) {
+      card.outerHTML = errorCard('Fout bij bewerkte query', e.message);
+    }
+  }
 }
 
 function copySparql(button) {

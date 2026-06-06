@@ -1,0 +1,364 @@
+DATAMODELREGELS RCE CHO
+Gebaseerd op CEO_RCE.ttl, Cultural Heritage Ontology, versie 1.5.
+Doel: voorkom verzonnen classes/properties en genereer alleen SPARQL-patronen die passen bij het CEO-datamodel.
+
+BELANGRIJKSTE INSTRUCTIE
+- Genereer alleen SPARQL. Geen uitleg, geen markdown, geen code fences.
+- Gebruik alleen classes en properties die hieronder staan of die expliciet in de basisprompt of voorbeeldqueries staan.
+- Verzin nooit Nederlandse meervoudsvormen als classnaam. Gebruik dus ceo:ArcheologischComplex, niet ceo:ArcheologischeComplexen.
+- Als je het juiste property-pad niet weet, kies een brede query zonder dat filter. Een brede correcte query is beter dan een specifieke foutieve query.
+- Gebruik OPTIONAL voor velden die niet op elk object aanwezig zijn.
+- Gebruik FILTER(CONTAINS(LCASE(STR(?waarde)), "term")) alleen op literals zoals naam, omschrijving, locatienaam, woonplaatsnaam of volledigAdres.
+- Gebruik geen stringfilter op URI's zoals provincie-URI's, gemeente-URI's of skos:Concept URI's, tenzij je bewust op STR(?uri) zoekt.
+
+PREFIXES
+Gebruik deze prefixes wanneer nodig:
+
+PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
+PREFIX ceosp: <https://linkeddata.cultureelerfgoed.nl/def/ceosp/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+GELDIGE CEO-CLASSES
+Gebruik bij voorkeur deze classes:
+
+- ceo:CultuurhistorischObject
+- ceo:Rijksmonument
+- ceo:ArcheologischComplex
+- ceo:ArcheologischTerrein
+- ceo:ArcheologischOnderzoeksgebied
+- ceo:Vondstlocatie
+- ceo:Vondsten
+- ceo:Grondsporen
+- ceo:Complex
+- ceo:Gezicht
+- ceo:Werelderfgoed
+- ceo:Geometrie
+- ceo:BasisregistratieRelatie
+- ceo:BAGRelatie
+- ceo:BRKRelatie
+- ceo:LocatieAanduiding
+- ceo:Naam
+- ceo:Omschrijving
+- ceo:Functie
+- ceo:Type
+- ceo:Materiaal
+- ceo:StijlEnCultuur
+- ceo:Gebeurtenis
+- ceo:Datering
+- ceo:BeginDatering
+- ceo:EindDatering
+- ceo:Kennisregistratie
+- ceo:BouwkundigeKwaliteit
+- ceo:ActorEnRol
+- ceo:Bronverwijzing
+
+CLASS-HIËRARCHIE
+- ceo:Rijksmonument is een ceo:CultuurhistorischObject.
+- ceo:ArcheologischTerrein is een ceo:CultuurhistorischObject.
+- ceo:ArcheologischOnderzoeksgebied is een ceo:CultuurhistorischObject.
+- ceo:Vondstlocatie is een ceo:CultuurhistorischObject.
+- ceo:Vondsten is een ceo:CultuurhistorischObject.
+- ceo:Grondsporen is een ceo:CultuurhistorischObject.
+- ceo:Complex is een ceo:CultuurhistorischObject.
+- ceo:Gezicht is een ceo:CultuurhistorischObject.
+- ceo:Werelderfgoed is een ceo:CultuurhistorischObject.
+- ceo:Naam, ceo:Omschrijving, ceo:Functie, ceo:Type, ceo:Materiaal, ceo:StijlEnCultuur, ceo:Gebeurtenis en ceo:BouwkundigeKwaliteit zijn kennisregistraties.
+
+ALGEMENE PATRONEN VOOR CULTUURHISTORISCHE OBJECTEN
+Deze properties hebben ceo:CultuurhistorischObject als domein en kunnen dus gebruikt worden bij rijksmonumenten, archeologische terreinen, vondstlocaties, enzovoort.
+
+Naam:
+?cho ceo:heeftNaam ?naamNode .
+?naamNode ceo:naam ?naam .
+OPTIONAL { ?naamNode ceo:huidigeNaam ?huidigeNaam . }
+
+Omschrijving:
+?cho ceo:heeftOmschrijving ?omschrijvingNode .
+?omschrijvingNode ceo:omschrijving ?omschrijving .
+OPTIONAL { ?omschrijvingNode ceo:heeftOmschrijvingstype ?omschrijvingstype . }
+
+Type:
+?cho ceo:heeftType ?typeNode .
+?typeNode ceo:heeftTypeNaam ?typeConcept .
+OPTIONAL { ?typeConcept skos:prefLabel ?typeLabel . }
+
+Functie:
+?cho ceo:heeftFunctie ?functieNode .
+?functieNode ceo:heeftFunctieNaam ?functieConcept .
+OPTIONAL { ?functieConcept skos:prefLabel ?functieLabel . }
+
+Materiaal:
+?cho ceo:heeftMateriaal ?materiaalNode .
+?materiaalNode ceo:heeftMateriaalNaam ?materiaalConcept .
+OPTIONAL { ?materiaalConcept skos:prefLabel ?materiaalLabel . }
+
+Stijl en cultuur:
+?cho ceo:heeftStijlEnCultuur ?stijlNode .
+?stijlNode ceo:heeftStijlEnCultuurNaam ?stijlConcept .
+OPTIONAL { ?stijlConcept skos:prefLabel ?stijlLabel . }
+
+Geometrie:
+?cho ceo:heeftGeometrie ?geometrie .
+OPTIONAL { ?geometrie ceo:asWKT-RD ?wktRD . }
+OPTIONAL { ?geometrie ceo:oppervlakteInVierkanteMeters ?oppervlakteM2 . }
+OPTIONAL { ?geometrie ceo:oppervlakteInHectare ?oppervlakteHa . }
+
+Locatieaanduiding:
+?cho ceo:heeftLocatieAanduiding ?locatie .
+OPTIONAL { ?locatie ceo:locatienaam ?locatienaam . }
+OPTIONAL { ?locatie ceo:locatieomschrijving ?locatieomschrijving . }
+OPTIONAL { ?locatie ceo:kaartbladcode ?kaartbladcode . }
+
+Basisregistratie:
+?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
+OPTIONAL { ?basisrelatie ceo:heeftGemeente ?gemeente . }
+OPTIONAL { ?basisrelatie ceo:heeftProvincie ?provincie . }
+OPTIONAL { ?basisrelatie ceo:heeftBAGRelatie ?bag . }
+OPTIONAL { ?basisrelatie ceo:heeftBRKRelatie ?brk . }
+
+Let op:
+- ceo:heeftProvincie heeft als domein ceo:BasisregistratieRelatie, niet ceo:Rijksmonument en niet ceo:ArcheologischComplex.
+- Gebruik daarom nooit: ?object ceo:heeftProvincie ?provincie .
+- Gebruik wel: ?object ceo:heeftBasisregistratieRelatie/ceo:heeftProvincie ?provincie .
+
+RIJKSMONUMENTEN
+Gebruik voor rijksmonumenten:
+?rm a ceo:Rijksmonument .
+
+Belangrijke datatype properties:
+- ceo:rijksmonumentnummer
+- ceo:datumInschrijvingInMonumentenregister
+- ceo:registergegeven
+
+Rijksmonumentnummer:
+OPTIONAL { ?rm ceo:rijksmonumentnummer ?rijksmonumentnummer . }
+
+Provincie via CEO-kernmodel:
+?rm ceo:heeftBasisregistratieRelatie/ceo:heeftProvincie <PROVINCIE_URI> .
+
+Gemeente via CEO-kernmodel:
+?rm ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente ?gemeente .
+OPTIONAL { ?gemeente skos:prefLabel ?gemeenteLabel . }
+
+Adres via ceosp, alleen als ceosp-prefix aanwezig is:
+OPTIONAL { ?rm ceosp:volledigAdres ?adres . }
+OPTIONAL { ?rm ceosp:woonplaatsnaam ?woonplaats . }
+OPTIONAL { ?rm ceosp:postcode ?postcode . }
+OPTIONAL { ?rm ceosp:huisnummer ?huisnummer . }
+
+Naam via ceosp, alleen als ceosp-prefix aanwezig is:
+OPTIONAL { ?rm ceosp:naam ?naam . }
+
+Type via ceosp, alleen als ceosp-prefix aanwezig is:
+OPTIONAL { ?rm ceosp:type ?type . }
+
+Functie via rijksmonument-specifieke properties:
+?rm ceo:heeftOorspronkelijkeFunctie ?functieNode .
+?functieNode ceo:heeftFunctieNaam ?functieConcept .
+OPTIONAL { ?functieConcept skos:prefLabel ?functieLabel . }
+
+of:
+?rm ceo:heeftHuidigeFunctie ?functieNode .
+?functieNode ceo:heeftFunctieNaam ?functieConcept .
+OPTIONAL { ?functieConcept skos:prefLabel ?functieLabel . }
+
+Zoeken op kerk, kasteel, molen, boerderij, enzovoort:
+- Zoek bij voorkeur in ceosp:type, ceosp:oorspronkelijkeFunctie, ceosp:naam of functieLabel.
+- Gebruik CONTAINS(LCASE(STR(?veld)), "kerk") alleen op tekstvelden of labels.
+
+Voorbeeld rijksmonumenten in provincie:
+SELECT ?rm ?rijksmonumentnummer ?naam ?adres
+WHERE {
+  ?rm a ceo:Rijksmonument .
+  ?rm ceo:heeftBasisregistratieRelatie/ceo:heeftProvincie <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)> .
+  OPTIONAL { ?rm ceo:rijksmonumentnummer ?rijksmonumentnummer . }
+  OPTIONAL { ?rm ceosp:naam ?naam . }
+  OPTIONAL { ?rm ceosp:volledigAdres ?adres . }
+}
+LIMIT 50
+
+ARCHEOLOGISCHE COMPLEXEN
+Gebruik voor archeologische complexen:
+?complex a ceo:ArcheologischComplex .
+
+Gebruik nooit:
+- ceo:ArcheologischeComplexen
+- ceo:ArcheologischComplexen
+- ceo:ArcheologischeComplex
+
+Belangrijke property:
+OPTIONAL { ?complex ceo:archis2Complexnummer ?complexnummer . }
+
+Let op:
+- ceo:ArcheologischComplex staat in de CEO niet als subclass van ceo:CultuurhistorischObject.
+- Gebruik daarom niet automatisch alle ceo:CultuurhistorischObject-patronen bij ceo:ArcheologischComplex.
+- Gebruik geen provinciepad bij ceo:ArcheologischComplex tenzij een werkende voorbeeldquery dat expliciet bewijst.
+- Gebruik geen ceo:heeftProvincie direct op ceo:ArcheologischComplex.
+- Gebruik geen ceosp:heeftProvincie bij ceo:ArcheologischComplex.
+
+Als een gebruiker vraagt naar archeologische complexen in een provincie:
+- Genereer liever een brede query voor archeologische complexen zonder provincie-filter.
+- Voeg eventueel een opmerking niet toe in de SPARQL, maar de query zelf moet correct blijven.
+
+Voorbeeld brede query voor archeologische complexen:
+SELECT ?complex ?complexnummer
+WHERE {
+  ?complex a ceo:ArcheologischComplex .
+  OPTIONAL { ?complex ceo:archis2Complexnummer ?complexnummer . }
+}
+LIMIT 50
+
+Voorbeeld telling archeologische complexen:
+SELECT (COUNT(DISTINCT ?complex) AS ?aantal)
+WHERE {
+  ?complex a ceo:ArcheologischComplex .
+}
+
+ARCHEOLOGISCHE TERREINEN
+Gebruik voor archeologische terreinen:
+?terrein a ceo:ArcheologischTerrein .
+
+Belangrijke properties:
+OPTIONAL { ?terrein ceo:archis2Monumentnummer ?archis2Monumentnummer . }
+OPTIONAL { ?terrein ceo:heeftArcheologischeWaardering ?waardering . }
+OPTIONAL { ?waardering skos:prefLabel ?waarderingLabel . }
+
+Omdat ceo:ArcheologischTerrein een ceo:CultuurhistorischObject is, mogen algemene patronen zoals naam, omschrijving, geometrie, locatieaanduiding en basisregistratie worden gebruikt.
+
+Provincie bij archeologische terreinen via basisregistratie, alleen als dit in de dataset resultaten geeft:
+?terrein ceo:heeftBasisregistratieRelatie/ceo:heeftProvincie <PROVINCIE_URI> .
+
+Voorbeeld archeologische terreinen in provincie:
+SELECT ?terrein ?archis2Monumentnummer ?naam ?omschrijving
+WHERE {
+  ?terrein a ceo:ArcheologischTerrein .
+  ?terrein ceo:heeftBasisregistratieRelatie/ceo:heeftProvincie <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)> .
+  OPTIONAL { ?terrein ceo:archis2Monumentnummer ?archis2Monumentnummer . }
+  OPTIONAL { ?terrein ceo:heeftNaam/ceo:naam ?naam . }
+  OPTIONAL { ?terrein ceo:heeftOmschrijving/ceo:omschrijving ?omschrijving . }
+}
+LIMIT 50
+
+VONDSTLOCATIES
+Gebruik voor vondstlocaties:
+?vondstlocatie a ceo:Vondstlocatie .
+
+Belangrijke properties:
+OPTIONAL { ?vondstlocatie ceo:archis2Vondstmeldingsnummer ?vondstmeldingsnummer . }
+OPTIONAL { ?vondstlocatie ceo:archis2Waarnemingsnummer ?waarnemingsnummer . }
+OPTIONAL { ?vondstlocatie ceo:heeftVerwerving ?verwerving . }
+OPTIONAL { ?verwerving skos:prefLabel ?verwervingLabel . }
+
+Omdat ceo:Vondstlocatie een ceo:CultuurhistorischObject is, mogen algemene patronen zoals naam, omschrijving, geometrie, locatieaanduiding en basisregistratie worden gebruikt.
+
+VONDSTEN EN GRONDSPOREN
+Gebruik voor vondsten:
+?vondsten a ceo:Vondsten .
+OPTIONAL { ?vondsten ceo:aantalVondsten ?aantalVondsten . }
+
+Gebruik voor grondsporen:
+?grondsporen a ceo:Grondsporen .
+OPTIONAL { ?grondsporen ceo:aantalGrondsporen ?aantalGrondsporen . }
+
+Gebruik voor vondsten ook:
+OPTIONAL { ?vondsten ceo:heeftToestand ?toestand . }
+OPTIONAL { ?toestand skos:prefLabel ?toestandLabel . }
+
+COMPLEXEN VAN RIJKSMONUMENTEN
+Gebruik voor complexen:
+?complex a ceo:Complex .
+OPTIONAL { ?complex ceo:complexnummer ?complexnummer . }
+
+Relaties:
+OPTIONAL { ?complex ceo:heeftHoofdobject ?hoofdobject . }
+OPTIONAL { ?complex ceo:heeftRijksmonument ?rijksmonument . }
+
+Rijksmonument naar complex:
+OPTIONAL { ?rm ceo:isHoofdobjectVanComplex ?complex . }
+OPTIONAL { ?rm ceo:isOnderdeelVanComplex ?complex . }
+
+GEZICHTEN EN WERELDERFGOED
+Gebruik voor beschermde gezichten:
+?gezicht a ceo:Gezicht .
+OPTIONAL { ?gezicht ceo:gezichtsnummer ?gezichtsnummer . }
+OPTIONAL { ?gezicht ceo:bijzonderGebied ?bijzonderGebied . }
+OPTIONAL { ?gezicht ceo:heeftGezichtsstatus ?gezichtsstatus . }
+OPTIONAL { ?gezichtsstatus skos:prefLabel ?gezichtsstatusLabel . }
+
+Gebruik voor werelderfgoed:
+?werelderfgoed a ceo:Werelderfgoed .
+
+LOCATIE EN PROVINCIES
+Provincie-URI's:
+- Drenthe: <http://standaarden.overheid.nl/owms/terms/Drenthe>
+- Flevoland: <http://standaarden.overheid.nl/owms/terms/Flevoland>
+- Fryslân: <http://standaarden.overheid.nl/owms/terms/Fryslan>
+- Gelderland: <http://standaarden.overheid.nl/owms/terms/Gelderland>
+- Groningen: <http://standaarden.overheid.nl/owms/terms/Groningen_(provincie)>
+- Limburg: <http://standaarden.overheid.nl/owms/terms/Limburg>
+- Noord-Brabant: <http://standaarden.overheid.nl/owms/terms/Noord-Brabant>
+- Noord-Holland: <http://standaarden.overheid.nl/owms/terms/Noord-Holland>
+- Overijssel: <http://standaarden.overheid.nl/owms/terms/Overijssel>
+- Utrecht: <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)>
+- Zeeland: <http://standaarden.overheid.nl/owms/terms/Zeeland>
+- Zuid-Holland: <http://standaarden.overheid.nl/owms/terms/Zuid-Holland>
+
+Gebruik provincie-filter alleen op een BasisregistratieRelatie:
+?cho ceo:heeftBasisregistratieRelatie/ceo:heeftProvincie <PROVINCIE_URI> .
+
+Gebruik gemeente-filter alleen op een BasisregistratieRelatie of op tekstvelden zoals ceosp:woonplaatsnaam:
+?cho ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente ?gemeente .
+OPTIONAL { ?gemeente skos:prefLabel ?gemeenteLabel . }
+FILTER(CONTAINS(LCASE(STR(?gemeenteLabel)), "utrecht"))
+
+of bij rijksmonumenten met ceosp:
+?rm ceosp:woonplaatsnaam ?woonplaats .
+FILTER(CONTAINS(LCASE(?woonplaats), "utrecht"))
+
+VERBODEN OF ONVEILIGE PATRONEN
+Gebruik nooit:
+- ?object ceo:heeftProvincie ?provincie .
+- ?complex ceo:heeftProvincie ?provincie .
+- ?complex ceosp:heeftProvincie ?provincie .
+- ?complex ceo:heeftBasisregistratieRelatie/ceo:heeftProvincie ?provincie . tenzij een werkende voorbeeldquery dit bewijst.
+- ceo:ArcheologischeComplexen
+- ceo:Rijksmonumenten
+- ceo:Vondstlocaties
+- ceo:ArcheologischeTerreinen
+
+Gebruik geen properties die niet in deze regels, de CEO of werkende voorbeeldqueries staan.
+
+QUERYVORMEN
+Lijstmodus:
+- Gebruik SELECT DISTINCT.
+- Gebruik geen COUNT.
+- Gebruik LIMIT 50 of lager, tenzij gebruiker expliciet om meer vraagt.
+
+Tellingmodus:
+- Gebruik SELECT (COUNT(DISTINCT ?object) AS ?aantal).
+- Gebruik geen gewone lijst met objecten.
+
+Voorbeeld lijstmodus:
+SELECT DISTINCT ?rm ?rijksmonumentnummer ?naam ?adres
+WHERE {
+  ?rm a ceo:Rijksmonument .
+  OPTIONAL { ?rm ceo:rijksmonumentnummer ?rijksmonumentnummer . }
+  OPTIONAL { ?rm ceosp:naam ?naam . }
+  OPTIONAL { ?rm ceosp:volledigAdres ?adres . }
+}
+LIMIT 50
+
+Voorbeeld tellingmodus:
+SELECT (COUNT(DISTINCT ?rm) AS ?aantal)
+WHERE {
+  ?rm a ceo:Rijksmonument .
+}
+
+ALS JE TWIJFELT
+- Kies het hoogste veilige objecttype.
+- Gebruik alleen rdf:type en bekende identifier-properties.
+- Voeg OPTIONAL naam/omschrijving toe als het object een ceo:CultuurhistorischObject is.
+- Laat onzekere locatie- of provincie-filters weg.
+- Verzin nooit een property om de vraag toch specifieker te maken.
