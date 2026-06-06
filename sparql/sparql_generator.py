@@ -1,5 +1,5 @@
 """
-SPARQL query generator — ondersteunt Anthropic en Google Gemini.
+SPARQL query generator — ondersteunt Anthropic, Google Gemini en Ollama.
 Provider wordt bepaald via LLM_PROVIDER in config/environment.
 """
 
@@ -20,6 +20,7 @@ def _load_prompt(name: str) -> str:
 
 def _generate_anthropic(question: str, system_prompt: str) -> str:
     import anthropic
+
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
     message = client.messages.create(
         model=config.ANTHROPIC_MODEL,
@@ -32,6 +33,7 @@ def _generate_anthropic(question: str, system_prompt: str) -> str:
 
 def _generate_google(question: str, system_prompt: str) -> str:
     import google.generativeai as genai
+
     genai.configure(api_key=config.GOOGLE_API_KEY)
     model = genai.GenerativeModel(
         model_name=config.GOOGLE_MODEL,
@@ -41,10 +43,39 @@ def _generate_google(question: str, system_prompt: str) -> str:
     return response.text
 
 
+def _generate_ollama(question: str, system_prompt: str) -> str:
+    import ollama
+
+    response = ollama.chat(
+        model=config.OLLAMA_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question},
+        ],
+        options={
+            "temperature": 0,
+            "num_ctx": 8192,
+        },
+    )
+    return response["message"]["content"]
+
+
 def _generate(question: str, system_prompt: str) -> str:
-    if config.LLM_PROVIDER == "google":
+    provider = config.LLM_PROVIDER.lower()
+
+    if provider == "ollama":
+        return _generate_ollama(question, system_prompt)
+
+    if provider == "google":
         return _generate_google(question, system_prompt)
-    return _generate_anthropic(question, system_prompt)
+
+    if provider == "anthropic":
+        return _generate_anthropic(question, system_prompt)
+
+    raise ValueError(
+        f"Onbekende LLM_PROVIDER: {config.LLM_PROVIDER}. "
+        "Gebruik 'ollama', 'google' of 'anthropic'."
+    )
 
 
 def generate(question: str, mode: str) -> str:
