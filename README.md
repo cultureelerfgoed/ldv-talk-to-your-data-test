@@ -1,87 +1,224 @@
 # RCE Erfgoed Assistent
 
-Een webapplicatie waarmee je in gewone taal vragen kunt stellen aan de linked data van de Rijksdienst voor het Cultureel Erfgoed (RCE). De app vertaalt je vraag automatisch naar SPARQL, bevraagt het RCE endpoint, en geeft een leesbaar antwoord terug.
+Een lokale webapplicatie waarmee je in gewone taal vragen kunt stellen aan de linked data van de Rijksdienst voor het Cultureel Erfgoed (RCE).
 
-## Wat het doet
+De applicatie vertaalt Nederlandse vragen automatisch naar SPARQL, bevraagt het RCE endpoint en geeft een leesbaar antwoord terug.
 
-- Stel vragen in Nederlands, zoals *"Welke rijksmonumenten staan er in Zeist?"* of *"Hoeveel kerken zijn er in Utrecht?"*
-- Kies tussen **Lijst** (alle monumenten als rijen) of **Telling** (een aantal)
-- Bekijk de gegenereerde SPARQL query
-- Exporteer resultaten als CSV, direct te openen in Excel
-- Resultaten uit vrije tekstvelden worden als **onzeker** gemarkeerd
+De app ondersteunt meerdere LLM-providers:
+
+- Ollama (lokaal)
+- Anthropic Claude
+- Google Gemini
+
+De applicatie is geoptimaliseerd voor de Cultureel Erfgoed Ontologie (CEO) en bevat extra datamodelregels om betere SPARQL queries te genereren.
+
+---
+
+# Functionaliteit
+
+- Stel vragen in natuurlijke taal
+- Genereer automatisch SPARQL queries
+- Bekijk en bewerk SPARQL queries
+- Voer SPARQL direct uit op het RCE endpoint
+- Krijg een leesbaar Nederlands antwoord
+- Exporteer resultaten als CSV
+
+Ondersteunde objecttypen:
+
+- Rijksmonumenten
+- Complexen
+- Archeologische complexen
+- Archeologische terreinen
+- Archeologische onderzoeksgebieden
+- Vondsten
+- Grondsporen
+- Functies
+- Actoren
+- Materialen
+- Stijlen
+
+---
+
+# Voorbeeldvragen
+
+## Rijksmonumenten
+
+- Welke rijksmonumenten staan er in Zeist?
+- Hoeveel kerken zijn er in Utrecht?
+- Welke archeologische rijksmonumenten zijn er in Utrecht?
+- Welke kastelen staan er in Gelderland?
 
 ## Architectuur
 
-```
-frontend/index.html     — gebruikersinterface (browser)
-app.py                  — Flask backend (localhost:5000)
-config.py               — instellingen en provincie URI mapping
-sparql/
-  sparql_generator.py   — genereert SPARQL via Claude
-  executor.py           — voert query uit op RCE endpoint
-  postprocess.py        — prefix-injectie, provincie-normalisatie, LIMIT-verwijdering
-  prompts/
-    lijst.txt           — system prompt voor lijstvragen
-    telling.txt         — system prompt voor tellingsvragen
+- Wie is de architect van het Rijksmuseum?
+- Welke monumenten zijn ontworpen door Cuypers?
+- Welke monumenten hebben een neogotische stijl?
+
+## Archeologie
+
+- Welke archeologische complexen zijn er?
+- Welke archeologische terreinen zijn er in Limburg?
+- Welke vondsten bevatten aardewerk?
+- Welke grondsporen horen bij een vondstlocatie?
+
+---
+
+# Architectuur
+
+```text
+frontend/
+  index.html                 — gebruikersinterface
+
 answer/
-  answer_generator.py   — vertaalt resultaten naar Nederlands antwoord
+  answer_generator.py        — genereert leesbare antwoorden
+
+sparql/
+  executor.py                — voert SPARQL queries uit
+  postprocess.py             — normalisatie en correcties
+  sparql_generator.py        — genereert SPARQL via LLM
+
+  prompts/
+    lijst.txt                — prompt voor lijstvragen
+    telling.txt              — prompt voor tellingen
+    datamodel_rules.txt      — CEO datamodelregels en querypatronen
+
+config.py                    — configuratie
+app.py                       — Flask backend
+requirements.txt             — Python dependencies
+.env.example                 — voorbeeldconfiguratie
 ```
 
-## Vereisten
+---
+
+# Vereisten
 
 - Python 3.10+
-- Anthropic API key ([console.anthropic.com](https://console.anthropic.com))
+- Git
+- Ollama (optioneel voor lokaal gebruik)
 
-## Installatie
+---
+
+# Installatie
+
+## Repository clonen
+
+```powershell
+git clone https://github.com/jolietjakeblues/ldv-talk-to-your-data-test.git
+cd ldv-talk-to-your-data-test
+```
+
+## Virtual environment aanmaken
+
+```powershell
+python -m venv .venv
+```
+
+## Virtual environment activeren
+
+### Windows PowerShell
+
+```powershell
+.venv\Scripts\activate
+```
+
+### Linux/macOS
+
+```bash
+source .venv/bin/activate
+```
+
+## Dependencies installeren
 
 ```powershell
 pip install -r requirements.txt
+```
+
+---
+
+# Ollama installeren
+
+Download Ollama:
+
+https://ollama.com/download
+
+Controleer daarna:
+
+```powershell
+ollama list
+```
+
+Installeer bijvoorbeeld:
+
+```powershell
+ollama pull qwen2.5-coder:14b
+```
+
+---
+
+# Configuratie
+
+Kopieer eerst:
+
+```powershell
 copy .env.example .env
 ```
 
-Open `.env` en vul je Anthropic API key in:
-```
-ANTHROPIC_API_KEY=sk-ant-...
+## Voorbeeld `.env`
+
+```env
+LLM_PROVIDER=ollama
+
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5-coder:14b
+
+SPARQL_ENDPOINT=https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql
+
+FLASK_PORT=5000
+FLASK_DEBUG=true
 ```
 
-## Opstarten
+---
 
-```powershell
-powershell -ExecutionPolicy Bypass -File start.ps1
-```
+# Applicatie starten
 
-Of handmatig:
 ```powershell
 python app.py
 ```
-Open daarna `frontend/index.html` in je browser.
 
-## Datamodel
+Open daarna:
 
-De app gebruikt de [Cultureel Erfgoed Ontologie (CEO)](https://linkeddata.cultureelerfgoed.nl/def/ceo) van de RCE en bevraagt het SPARQL endpoint op:
+http://127.0.0.1:5000
 
+---
+
+# Datamodelregels
+
+De applicatie gebruikt aanvullende regels in:
+
+```text
+sparql/prompts/datamodel_rules.txt
 ```
-https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql
-```
 
-## Configuratie
+Deze regels helpen de LLM om:
 
-Alle instellingen staan in `.env`:
+- geldige CEO classes te gebruiken
+- correcte property-paden te kiezen
+- hallucinaties te voorkomen
+- betere SPARQL queries te genereren
 
-| Variabele | Standaard | Omschrijving |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | — | Verplicht |
-| `ANTHROPIC_MODEL` | `claude-sonnet-4-5` | Te gebruiken model |
-| `SPARQL_ENDPOINT` | RCE endpoint | SPARQL endpoint URL |
-| `FLASK_PORT` | `5000` | Poort voor de backend |
-| `FLASK_DEBUG` | `false` | Debug modus |
+---
 
-## Bekende beperkingen
+# Bekende beperkingen
 
-- Zoeken op functie/type gebruikt string-matching op thesaurusconcepten — synoniemen worden niet automatisch herkend
-- Provincienamen worden genormaliseerd naar OWMS URIs; onbekende spelwijzen vallen terug op de originele zoekterm
-- De app is bedoeld als lokale tool, niet als productie-webapplicatie (API key zit in `.env` op de server)
+- Niet alle CEO-relaties zijn volledig gedocumenteerd
+- Sommige architectgegevens zijn literals
+- Sommige locatiepaden verschillen per objecttype
+- Archeologische objecten gebruiken andere structuurpatronen dan rijksmonumenten
+- Synoniemenherkenning blijft beperkt
+- Grote queries kunnen traag zijn
 
-## Licentie
+---
+
+# Licentie
 
 MIT

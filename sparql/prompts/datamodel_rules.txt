@@ -227,7 +227,6 @@ Archeologische rijksmonumenten:
 ?cho ceo:heeftMonumentAard ?monumentaard .
 ?monumentaard skos:prefLabel ?monumentaardLabel .
 FILTER(
-  LANGMATCHES(LANG(?monumentaardLabel), "nl") &&
   LCASE(STR(?monumentaardLabel)) = "archeologisch"
 )
 
@@ -236,7 +235,6 @@ Gebouwde rijksmonumenten:
 ?cho ceo:heeftMonumentAard ?monumentaard .
 ?monumentaard skos:prefLabel ?monumentaardLabel .
 FILTER(
-  LANGMATCHES(LANG(?monumentaardLabel), "nl") &&
   LCASE(STR(?monumentaardLabel)) = "onroerend gebouwd"
 )
 
@@ -312,8 +310,7 @@ WHERE {
   ?monumentaard skos:prefLabel ?monumentaardLabel .
 
   FILTER(
-    LANGMATCHES(LANG(?monumentaardLabel), "nl") &&
-    LCASE(STR(?monumentaardLabel)) = "archeologisch"
+      LCASE(STR(?monumentaardLabel)) = "archeologisch"
   )
 }
 
