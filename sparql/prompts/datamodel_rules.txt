@@ -1,168 +1,580 @@
-"""
-SPARQL query generator — ondersteunt Anthropic, Google Gemini en Ollama.
-Provider wordt bepaald via LLM_PROVIDER in config/environment.
-"""
+DATAMODELREGELS RCE CEO
 
-import logging
-from pathlib import Path
+Doel:
+Deze regels helpen de LLM om geldige SPARQL te maken voor het RCE CHO endpoint.
+Gebruik deze regels boven algemene aannames.
 
-import config
-from sparql.postprocess import postprocess, has_count
+PREFIXEN
 
-logger = logging.getLogger(__name__)
+Gebruik deze prefixen:
 
-_PROMPTS_DIR = Path(__file__).parent / "prompts"
+PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
+PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 
+Gebruik nooit:
+- ceosp:
+- ceox:
 
-def _load_prompt(name: str) -> str:
-    return (_PROMPTS_DIR / f"{name}.txt").read_text(encoding="utf-8")
+ALGEMENE REGELS
 
+- Genereer alleen SPARQL.
+- Gebruik geen uitleg buiten de SPARQL-query.
+- Verzin geen classes.
+- Verzin geen properties.
+- Gebruik geen meervoud als classnaam.
+- Gebruik alleen termen uit de CEO of uit deze bewezen patronen.
+- Gebruik bij lijstvragen LIMIT, tenzij de gebruiker expliciet alle resultaten vraagt.
+- Gebruik COUNT alleen in tellingmodus.
+- Gebruik DISTINCT bij tellingen met joins.
+- Gebruik OPTIONAL voor naam, omschrijving, adres, type, functie en geometrie.
+- Gebruik geen SELECT *.
 
-def _load_optional_prompt(name: str) -> str:
-    path = _PROMPTS_DIR / f"{name}.txt"
+GELDIGE HOOFDCLASSES
 
-    if not path.exists():
-        logger.warning("Optioneel promptbestand ontbreekt: %s", path)
-        return ""
+- ceo:Rijksmonument
+- ceo:Complex
+- ceo:ArcheologischComplex
+- ceo:ArcheologischTerrein
+- ceo:ArcheologischOnderzoeksgebied
+- ceo:Vondstlocatie
+- ceo:Vondsten
+- ceo:Grondsporen
+- ceo:BasisregistratieRelatie
+- ceo:BAGRelatie
+- ceo:BRKRelatie
+- ceo:Naam
+- ceo:Omschrijving
+- ceo:LocatieAanduiding
+- ceo:Functie
+- ceo:Type
+- ceo:Gebeurtenis
+- ceo:Materiaal
+- ceo:Geometrie
+- ceo:Kennisregistratie
 
-    return path.read_text(encoding="utf-8")
+VERBODEN TERMEN
 
+Gebruik nooit:
 
-def _build_system_prompt(mode: str) -> str:
-    """
-    Bouw de volledige system prompt.
-
-    De basisprompt bepaalt de modus:
-    - lijst
-    - telling
-
-    datamodel_rules.txt bevat harde regels uit de CEO ontologie en uit bewezen instance-patronen.
-    Die regels beperken hallucinaties in classes, properties en property-paden.
-    """
-
-    base_prompt = _load_prompt(mode)
-    datamodel_rules = _load_optional_prompt("datamodel_rules")
-
-    parts = [base_prompt]
-
-    if datamodel_rules.strip():
-        parts.append(datamodel_rules)
-
-    return "\n\n".join(parts)
-
-
-def _generate_anthropic(question: str, system_prompt: str) -> str:
-    import anthropic
-
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-
-    message = client.messages.create(
-        model=config.ANTHROPIC_MODEL,
-        max_tokens=1200,
-        system=system_prompt,
-        messages=[{"role": "user", "content": question}],
-    )
-
-    return message.content[0].text
-
-
-def _generate_google(question: str, system_prompt: str) -> str:
-    import google.generativeai as genai
-
-    genai.configure(api_key=config.GOOGLE_API_KEY)
-
-    model = genai.GenerativeModel(
-        model_name=config.GOOGLE_MODEL,
-        system_instruction=system_prompt,
-    )
-
-    response = model.generate_content(question)
-
-    return response.text
-
-
-def _generate_ollama(question: str, system_prompt: str) -> str:
-    import ollama
-
-    response = ollama.chat(
-        model=config.OLLAMA_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question},
-        ],
-        options={
-            "temperature": 0,
-            "num_ctx": int(getattr(config, "OLLAMA_NUM_CTX", 12000)),
-        },
-    )
-
-    return response["message"]["content"]
-
-
-def _generate(question: str, system_prompt: str) -> str:
-    provider = config.LLM_PROVIDER.lower()
-
-    if provider == "ollama":
-        return _generate_ollama(question, system_prompt)
-
-    if provider == "google":
-        return _generate_google(question, system_prompt)
-
-    if provider == "anthropic":
-        return _generate_anthropic(question, system_prompt)
-
-    raise ValueError(
-        f"Onbekende LLM_PROVIDER: {config.LLM_PROVIDER}. "
-        "Gebruik 'ollama', 'google' of 'anthropic'."
-    )
-
-
-def generate(question: str, mode: str) -> str:
-    """
-    Genereer een SPARQL query op basis van een natuurlijke vraag.
-
-    Args:
-        question: De vraag in natuurlijke taal.
-        mode:     'lijst' of 'telling'.
-
-    Returns:
-        Een nabewerkte SPARQL query als string.
-    """
-
-    system_prompt = _build_system_prompt(mode)
-
-    logger.info(
-        "Query genereren via %s (modus: %s)",
-        config.LLM_PROVIDER,
-        mode,
-    )
-
-    query = _generate(question, system_prompt)
-    query = postprocess(query, mode)
-
-    if mode == "lijst" and has_count(query):
-        logger.warning("LLM genereerde COUNT in lijstmodus — correctie-aanroep")
-
-        corrected = (
-            question
-            + " (geef een lijst van individuele resultaten, geen telling)"
-        )
-
-        query = _generate(corrected, system_prompt)
-        query = postprocess(query, mode)
-
-    logger.info("Query gegenereerd (%d tekens)", len(query))
-
-    return query
-
+- ceo:Rijksmonumenten
+- ceo:ArcheologischeComplexen
+- ceo:ArcheologischeTerreinen
+- ceo:Vondst
+- ceosp:heeftProvincie
+- ceox:heeftProvincie
+- ceox:heeftAdresgegevens
 
 SEMANTISCHE INTERPRETATIE
 
 "architect", "ontwerper", "bouwmeester"
-→ gebruik ceo:ActorEnRol
+→ gebruik ceo:architect
 
 "stijl"
 → gebruik ceo:StijlEnCultuur
 
 "materiaal"
 → gebruik ceo:Materiaal
+
+"functie"
+→ gebruik ceo:Functie
+
+"type"
+→ gebruik ceo:Type
+
+"archeologische rijksmonumenten"
+→ gebruik ceo:Rijksmonument
+→ filter met ceo:heeftMonumentAard
+→ skos:prefLabel = "archeologisch"
+
+"gebouwde rijksmonumenten"
+→ gebruik ceo:Rijksmonument
+→ filter met ceo:heeftMonumentAard
+→ skos:prefLabel = "onroerend gebouwd"
+
+BASISREGISTRATIE EN LOCATIE
+
+Provincie staat niet direct op een cultuurhistorisch object.
+Provincie loopt via ceo:heeftBasisregistratieRelatie.
+
+Correct patroon:
+
+?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
+?basisrelatie ceo:heeftProvincie <PROVINCIE_URI> .
+
+Gebruik nooit:
+
+?cho ceo:heeftProvincie <PROVINCIE_URI> .
+
+Gemeente loopt ook via basisregistratie:
+
+?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
+?basisrelatie ceo:heeftGemeente ?gemeente .
+
+Adres en woonplaats lopen via BAGRelatie:
+
+?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
+?basisrelatie ceo:heeftBAGRelatie ?bag .
+OPTIONAL { ?bag ceo:woonplaatsnaam ?woonplaats . }
+OPTIONAL { ?bag ceo:volledigAdres ?adres . }
+
+Zoeken op woonplaatsnaam:
+
+?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
+?basisrelatie ceo:heeftBAGRelatie ?bag .
+?bag ceo:woonplaatsnaam ?woonplaats .
+FILTER(LCASE(STR(?woonplaats)) = "zeist")
+
+PROVINCIE URI'S
+
+Gebruik deze URI's:
+
+- Drenthe: <http://standaarden.overheid.nl/owms/terms/Drenthe>
+- Flevoland: <http://standaarden.overheid.nl/owms/terms/Flevoland>
+- Fryslân: <http://standaarden.overheid.nl/owms/terms/Fryslan>
+- Friesland: <http://standaarden.overheid.nl/owms/terms/Fryslan>
+- Gelderland: <http://standaarden.overheid.nl/owms/terms/Gelderland>
+- Groningen: <http://standaarden.overheid.nl/owms/terms/Groningen_(provincie)>
+- Limburg: <http://standaarden.overheid.nl/owms/terms/Limburg>
+- Noord-Brabant: <http://standaarden.overheid.nl/owms/terms/Noord-Brabant>
+- Noord-Holland: <http://standaarden.overheid.nl/owms/terms/Noord-Holland>
+- Overijssel: <http://standaarden.overheid.nl/owms/terms/Overijssel>
+- Utrecht: <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)>
+- Zeeland: <http://standaarden.overheid.nl/owms/terms/Zeeland>
+- Zuid-Holland: <http://standaarden.overheid.nl/owms/terms/Zuid-Holland>
+
+NAAM
+
+Naam staat op een ceo:Naam-node.
+
+Correct patroon:
+
+OPTIONAL {
+  ?cho ceo:heeftNaam ?naamNode .
+  ?naamNode ceo:naam ?naam .
+}
+
+OMSCHRIJVING
+
+Omschrijving staat op een ceo:Omschrijving-node.
+
+Correct patroon:
+
+OPTIONAL {
+  ?cho ceo:heeftOmschrijving ?omschrijvingNode .
+  ?omschrijvingNode ceo:omschrijving ?omschrijving .
+}
+
+Omschrijving is vrije tekst.
+Gebruik omschrijving alleen voor tonen of als laatste redmiddel voor zoeken.
+Als een resultaat alleen via omschrijving matcht, voeg toe:
+
+BIND("omschrijving (onzeker)" AS ?bron)
+
+LOCATIEAANDUIDING
+
+Locatieaanduiding staat op een ceo:LocatieAanduiding-node.
+
+Correct patroon:
+
+OPTIONAL {
+  ?cho ceo:heeftLocatieAanduiding ?locatie .
+  OPTIONAL { ?locatie ceo:locatienaam ?locatienaam . }
+  OPTIONAL { ?locatie ceo:locatieomschrijving ?locatieomschrijving . }
+}
+
+ARCHITECT
+
+Architect-informatie kan direct als literal voorkomen.
+
+Gebruik voor architectvragen:
+
+OPTIONAL {
+  ?cho ceo:architect ?architect .
+}
+
+Zoeken naar architect van een monument:
+
+SELECT ?cho ?naam ?architect
+WHERE {
+  ?cho a ceo:Rijksmonument .
+
+  ?cho ceo:heeftNaam ?naamNode .
+  ?naamNode ceo:naam ?naam .
+
+  FILTER(CONTAINS(LCASE(STR(?naam)), "rijksmuseum"))
+
+  OPTIONAL {
+    ?cho ceo:architect ?architect .
+  }
+}
+LIMIT 10
+
+MONUMENTAARD
+
+ceo:heeftMonumentAard geeft de aard van een rijksmonument aan.
+De waarde is een skos:Concept.
+
+De relevante skos:prefLabel waarden zijn:
+- "onroerend gebouwd"
+- "archeologisch"
+
+Archeologische rijksmonumenten:
+
+?cho ceo:heeftMonumentAard ?monumentaard .
+?monumentaard skos:prefLabel ?monumentaardLabel .
+FILTER(
+  LANGMATCHES(LANG(?monumentaardLabel), "nl") &&
+  LCASE(STR(?monumentaardLabel)) = "archeologisch"
+)
+
+Gebouwde rijksmonumenten:
+
+?cho ceo:heeftMonumentAard ?monumentaard .
+?monumentaard skos:prefLabel ?monumentaardLabel .
+FILTER(
+  LANGMATCHES(LANG(?monumentaardLabel), "nl") &&
+  LCASE(STR(?monumentaardLabel)) = "onroerend gebouwd"
+)
+
+Gebruik voor "archeologische rijksmonumenten" altijd ceo:heeftMonumentAard.
+Gebruik niet ceo:ArcheologischTerrein of ceo:ArcheologischComplex, tenzij de gebruiker expliciet naar terreinen of complexen vraagt.
+
+RIJKSMONUMENTEN
+
+Class:
+
+?cho a ceo:Rijksmonument .
+
+Bewezen directe properties op ceo:Rijksmonument:
+- ceo:cultuurhistorischObjectnummer
+- ceo:rijksmonumentnummer
+- ceo:datumInschrijvingInMonumentenregister
+- ceo:registratiedatum
+- ceo:heeftBasisregistratieRelatie
+- ceo:heeftGeometrie
+- ceo:heeftJuridischeStatus
+- ceo:heeftKennisregistratie
+- ceo:heeftLocatieAanduiding
+- ceo:heeftMonumentAard
+- ceo:heeftNaam
+- ceo:heeftOmschrijving
+- ceo:heeftOorspronkelijkeFunctie
+- ceo:isHoofdobjectVanComplex
+- ceo:isOnderdeelVanComplex
+- ceo:architect
+
+Rijksmonumentnummer:
+
+OPTIONAL { ?cho ceo:rijksmonumentnummer ?rijksmonumentnummer . }
+
+Cultuurhistorisch objectnummer:
+
+OPTIONAL { ?cho ceo:cultuurhistorischObjectnummer ?choNummer . }
+
+Rijksmonumenten in provincie:
+
+SELECT ?cho ?rijksmonumentnummer ?naam ?woonplaats ?adres
+WHERE {
+  ?cho a ceo:Rijksmonument .
+
+  ?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
+  ?basisrelatie ceo:heeftProvincie <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)> .
+
+  OPTIONAL { ?cho ceo:rijksmonumentnummer ?rijksmonumentnummer . }
+
+  OPTIONAL {
+    ?cho ceo:heeftNaam ?naamNode .
+    ?naamNode ceo:naam ?naam .
+  }
+
+  OPTIONAL {
+    ?basisrelatie ceo:heeftBAGRelatie ?bag .
+    OPTIONAL { ?bag ceo:woonplaatsnaam ?woonplaats . }
+    OPTIONAL { ?bag ceo:volledigAdres ?adres . }
+  }
+}
+LIMIT 50
+
+Archeologische rijksmonumenten in provincie:
+
+SELECT (COUNT(DISTINCT ?cho) AS ?aantal)
+WHERE {
+  ?cho a ceo:Rijksmonument .
+
+  ?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
+  ?basisrelatie ceo:heeftProvincie <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)> .
+
+  ?cho ceo:heeftMonumentAard ?monumentaard .
+  ?monumentaard skos:prefLabel ?monumentaardLabel .
+
+  FILTER(
+    LANGMATCHES(LANG(?monumentaardLabel), "nl") &&
+    LCASE(STR(?monumentaardLabel)) = "archeologisch"
+  )
+}
+
+COMPLEXEN
+
+Class:
+
+?complex a ceo:Complex .
+
+Bewezen directe properties op ceo:Complex:
+- ceo:complexnummer
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftHoofdobject
+- ceo:heeftKennisregistratie
+- ceo:heeftNaam
+- ceo:heeftRijksmonument
+- ceo:registratiedatum
+
+Complexen hebben geen bewezen directe locatie.
+Gebruik gekoppelde rijksmonumenten of hoofdobject voor locatievragen.
+
+Complexen in provincie:
+
+SELECT DISTINCT ?complex ?complexnummer ?naam
+WHERE {
+  ?complex a ceo:Complex .
+  ?complex ceo:heeftRijksmonument ?rijksmonument .
+
+  ?rijksmonument ceo:heeftBasisregistratieRelatie ?basisrelatie .
+  ?basisrelatie ceo:heeftProvincie <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)> .
+
+  OPTIONAL { ?complex ceo:complexnummer ?complexnummer . }
+
+  OPTIONAL {
+    ?complex ceo:heeftNaam ?naamNode .
+    ?naamNode ceo:naam ?naam .
+  }
+}
+LIMIT 50
+
+ARCHEOLOGISCHE COMPLEXEN
+
+Class:
+
+?complex a ceo:ArcheologischComplex .
+
+Gebruik nooit:
+
+?complex a ceo:ArcheologischeComplexen .
+
+Bewezen directe properties op ceo:ArcheologischComplex:
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftGebeurtenis
+- ceo:heeftKennisregistratie
+- ceo:heeftType
+- ceo:ligtInObject
+- ceo:registratiedatum
+
+Een ceo:ArcheologischComplex heeft in de instance-data geen bewezen directe basisregistratie.
+Gebruik voor locatie/provincie het bovenliggende onderzoeksgebied via ceo:ligtInObject.
+
+Correct locatiepad:
+
+?complex ceo:ligtInObject ?onderzoeksgebied .
+?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
+?onderzoeksgebied ceo:heeftBasisregistratieRelatie ?basisrelatie .
+?basisrelatie ceo:heeftProvincie <PROVINCIE_URI> .
+
+Gebruik niet:
+
+?complex ceo:heeftBasisregistratieRelatie ?basisrelatie .
+?complex ceo:heeftProvincie <PROVINCIE_URI> .
+
+ARCHEOLOGISCHE TERREINEN
+
+Class:
+
+?terrein a ceo:ArcheologischTerrein .
+
+Bewezen directe properties op ceo:ArcheologischTerrein:
+- ceo:archis2Monumentnummer
+- ceo:bevatObject
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftArcheologischeWaardering
+- ceo:heeftBasisregistratieRelatie
+- ceo:heeftKennisregistratie
+- ceo:heeftLocatieAanduiding
+- ceo:heeftOmschrijving
+- ceo:heeftVertrouwelijkAanduiding
+- ceo:registratiedatum
+
+Archeologische terreinen kunnen direct via basisregistratie naar provincie.
+
+ARCHEOLOGISCHE ONDERZOEKSGEBIEDEN
+
+Class:
+
+?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
+
+Bewezen directe properties:
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftBasisregistratieRelatie
+- ceo:heeftGeometrie
+- ceo:heeftVertrouwelijkAanduiding
+- ceo:registratiedatum
+
+Onderzoeksgebieden kunnen direct via basisregistratie naar provincie.
+
+VONDSTEN
+
+Class:
+
+?vondst a ceo:Vondsten .
+
+Bewezen directe properties op ceo:Vondsten:
+- ceo:aantalVondsten
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftGebeurtenis
+- ceo:heeftKennisregistratie
+- ceo:heeftMateriaal
+- ceo:heeftToestand
+- ceo:heeftType
+- ceo:ligtInObject
+- ceo:registratiedatum
+
+Vondsten liggen in een vondstlocatie:
+
+?vondst ceo:ligtInObject ?vondstlocatie .
+
+Gebruik voor telling van vondsten meestal SUM(?aantalVondsten), niet COUNT(?vondst), als de vraag gaat over aantallen vondsten.
+
+GRONDSPOREN
+
+Class:
+
+?grondspoor a ceo:Grondsporen .
+
+Bewezen directe properties op ceo:Grondsporen:
+- ceo:aantalGrondsporen
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftGebeurtenis
+- ceo:heeftKennisregistratie
+- ceo:heeftType
+- ceo:ligtInObject
+- ceo:registratiedatum
+
+Grondsporen liggen in een vondstlocatie:
+
+?grondspoor ceo:ligtInObject ?vondstlocatie .
+
+Gebruik voor telling van grondsporen meestal SUM(?aantalGrondsporen), niet COUNT(?grondspoor), als de vraag gaat over aantallen grondsporen.
+
+FUNCTIES
+
+Functie-node:
+
+?functie a ceo:Functie .
+
+Bewezen properties op ceo:Functie:
+- rdf:type ceo:Functie
+- rdf:type ceo:Kennisregistratie
+- ceo:formeelStandpunt
+- ceo:heeftBetrekkingOp
+- ceo:heeftFunctieNaam
+- ceo:hoofdfunctie
+- ceo:kennisregistratienummer
+- ceo:registratiedatum
+
+Vanaf rijksmonument naar oorspronkelijke functie:
+
+?cho ceo:heeftOorspronkelijkeFunctie ?functie .
+?functie ceo:heeftFunctieNaam ?functieConcept .
+OPTIONAL { ?functieConcept skos:prefLabel ?functieLabel . }
+
+Via kennisregistratie:
+
+?functie a ceo:Functie ;
+         ceo:heeftBetrekkingOp ?cho ;
+         ceo:heeftFunctieNaam ?functieConcept .
+OPTIONAL { ?functieConcept skos:prefLabel ?functieLabel . }
+
+Zoeken naar kerk via functie:
+
+?cho ceo:heeftOorspronkelijkeFunctie ?functie .
+?functie ceo:heeftFunctieNaam ?functieConcept .
+?functieConcept skos:prefLabel ?functieLabel .
+FILTER(CONTAINS(LCASE(STR(?functieLabel)), "kerk"))
+
+TYPE
+
+Type-node:
+
+?type a ceo:Type .
+
+Algemeen patroon:
+
+?cho ceo:heeftType ?type .
+?type ceo:heeftTypeNaam ?typeConcept .
+OPTIONAL { ?typeConcept skos:prefLabel ?typeLabel . }
+
+Zoeken op type, bijvoorbeeld kasteel:
+
+?cho ceo:heeftType ?type .
+?type ceo:heeftTypeNaam ?typeConcept .
+?typeConcept skos:prefLabel ?typeLabel .
+FILTER(CONTAINS(LCASE(STR(?typeLabel)), "kasteel"))
+
+MATERIAAL
+
+Materiaalpatroon:
+
+?cho ceo:heeftMateriaal ?materiaal .
+?materiaal ceo:heeftMateriaalNaam ?materiaalConcept .
+OPTIONAL { ?materiaalConcept skos:prefLabel ?materiaalLabel . }
+
+GEBEURTENIS
+
+Gebeurtenispatroon:
+
+?cho ceo:heeftGebeurtenis ?gebeurtenis .
+OPTIONAL {
+  ?gebeurtenis ceo:heeftGebeurtenisNaam ?gebeurtenisConcept .
+  OPTIONAL { ?gebeurtenisConcept skos:prefLabel ?gebeurtenisLabel . }
+}
+
+TELLINGEN
+
+Gebruik DISTINCT bij objecttellingen:
+
+SELECT (COUNT(DISTINCT ?cho) AS ?aantal)
+WHERE {
+  ?cho a ceo:Rijksmonument .
+}
+
+Voor objecten met aantalsproperty’s:
+
+Vondsten:
+
+SELECT (SUM(?aantalVondsten) AS ?aantal)
+WHERE {
+  ?vondst a ceo:Vondsten .
+  ?vondst ceo:aantalVondsten ?aantalVondsten .
+}
+
+Grondsporen:
+
+SELECT (SUM(?aantalGrondsporen) AS ?aantal)
+WHERE {
+  ?grondspoor a ceo:Grondsporen .
+  ?grondspoor ceo:aantalGrondsporen ?aantalGrondsporen .
+}
+
+OUTPUTREGELS
+
+- Gebruik geen SELECT *.
+- Geef altijd de URI terug van het hoofdobject.
+- Gebruik duidelijke variabelen.
+- Voeg relevante nummer-velden toe:
+  - ?rijksmonumentnummer
+  - ?complexnummer
+  - ?archis2Monumentnummer
+  - ?choNummer
+- Voeg waar mogelijk ?naam, ?woonplaats, ?adres of ?locatienaam toe.
+- Gebruik LIMIT 50 als geen ander aantal is gevraagd.
