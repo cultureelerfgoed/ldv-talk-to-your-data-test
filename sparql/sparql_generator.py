@@ -29,12 +29,21 @@ def _load_optional_prompt(name: str) -> str:
 
 
 def _build_system_prompt(mode: str) -> str:
+    """
+    Bouw de volledige system prompt.
+
+    De basisprompt bepaalt de modus:
+    - lijst
+    - telling
+
+    datamodel_rules.txt bevat harde regels uit de CEO ontologie en uit bewezen instance-patronen.
+    Die regels beperken hallucinaties in classes, properties en property-paden.
+    """
+
     base_prompt = _load_prompt(mode)
     datamodel_rules = _load_optional_prompt("datamodel_rules")
 
-    parts = [
-        base_prompt,
-    ]
+    parts = [base_prompt]
 
     if datamodel_rules.strip():
         parts.append(datamodel_rules)
@@ -49,7 +58,7 @@ def _generate_anthropic(question: str, system_prompt: str) -> str:
 
     message = client.messages.create(
         model=config.ANTHROPIC_MODEL,
-        max_tokens=1000,
+        max_tokens=1200,
         system=system_prompt,
         messages=[{"role": "user", "content": question}],
     )
@@ -83,7 +92,7 @@ def _generate_ollama(question: str, system_prompt: str) -> str:
         ],
         options={
             "temperature": 0,
-            "num_ctx": 8192,
+            "num_ctx": int(getattr(config, "OLLAMA_NUM_CTX", 12000)),
         },
     )
 
