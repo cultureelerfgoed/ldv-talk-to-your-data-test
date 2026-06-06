@@ -154,3 +154,15 @@ def generate(question: str, mode: str) -> str:
     logger.info("Query gegenereerd (%d tekens)", len(query))
 
     return query
+
+
+SEMANTISCHE INTERPRETATIE
+
+"architect", "ontwerper", "bouwmeester"
+→ gebruik ceo:ActorEnRol
+
+"stijl"
+→ gebruik ceo:StijlEnCultuur
+
+"materiaal"
+→ gebruik ceo:Materiaal
