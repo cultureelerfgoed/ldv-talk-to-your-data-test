@@ -42,6 +42,7 @@ SPARQL_PREFIXES = """\
 PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"""
 
 # Exacte provincie URIs uit de OWMS thesaurus
