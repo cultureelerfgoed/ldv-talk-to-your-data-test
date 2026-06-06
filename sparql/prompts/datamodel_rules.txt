@@ -70,8 +70,6 @@ Gebruik nooit:
 
 SEMANTISCHE INTERPRETATIE
 
-"architect", "ontwerper", "bouwmeester"
-→ gebruik ceo:architect
 
 "stijl"
 → gebruik ceo:StijlEnCultuur
@@ -186,32 +184,63 @@ OPTIONAL {
   OPTIONAL { ?locatie ceo:locatieomschrijving ?locatieomschrijving . }
 }
 
-ARCHITECT
+AACTOREN EN ROLLEN
 
-Architect-informatie kan direct als literal voorkomen.
+Gebruik geen ceo:architect.
+Architectinformatie loopt via ceo:Gebeurtenis en ceo:ActorEnRol.
 
-Gebruik voor architectvragen:
+CEO-patroon:
 
-OPTIONAL {
-  ?cho ceo:architect ?architect .
-}
+?cho ceo:heeftGebeurtenis ?gebeurtenis .
+?gebeurtenis ceo:heeftActorEnRol ?actorEnRol .
+?actorEnRol ceo:heeftActor ?actor .
+?actorEnRol ceo:heeftRol ?rol .
 
-Zoeken naar architect van een monument:
+Volgens de CEO hebben ceo:heeftActor en ceo:heeftRol range skos:Concept,
+maar in de huidige instance-data kunnen deze waarden literals zijn.
+Gebruik daarom STR() bij filters.
 
-SELECT ?cho ?naam ?architect
+Voor vragen met:
+- architect
+- ontwerper
+- bouwmeester
+- bouwkundige
+- constructeur
+
+filter op ceo:heeftRol:
+
+FILTER(CONTAINS(LCASE(STR(?rol)), "architect"))
+
+Voor vragen naar een specifieke persoon of organisatie als actor,
+filter op ceo:heeftActor:
+
+FILTER(CONTAINS(LCASE(STR(?actor)), "kramer"))
+
+Vraagpatroon:
+"Van welk rijksmonument is Kramer, Hendrik de architect?"
+
+Correct querypatroon:
+
+SELECT DISTINCT ?cho ?rijksmonumentnummer ?naam ?actor ?rol
 WHERE {
   ?cho a ceo:Rijksmonument .
 
-  ?cho ceo:heeftNaam ?naamNode .
-  ?naamNode ceo:naam ?naam .
+  ?cho ceo:heeftGebeurtenis ?gebeurtenis .
+  ?gebeurtenis ceo:heeftActorEnRol ?actorEnRol .
+  ?actorEnRol ceo:heeftActor ?actor .
+  ?actorEnRol ceo:heeftRol ?rol .
 
-  FILTER(CONTAINS(LCASE(STR(?naam)), "rijksmuseum"))
+  FILTER(CONTAINS(LCASE(STR(?actor)), "kramer"))
+  FILTER(CONTAINS(LCASE(STR(?rol)), "architect"))
+
+  OPTIONAL { ?cho ceo:rijksmonumentnummer ?rijksmonumentnummer . }
 
   OPTIONAL {
-    ?cho ceo:architect ?architect .
+    ?cho ceo:heeftNaam ?naamNode .
+    ?naamNode ceo:naam ?naam .
   }
 }
-LIMIT 10
+LIMIT 50
 
 MONUMENTAARD
 
@@ -263,7 +292,7 @@ Bewezen directe properties op ceo:Rijksmonument:
 - ceo:heeftOorspronkelijkeFunctie
 - ceo:isHoofdobjectVanComplex
 - ceo:isOnderdeelVanComplex
-- ceo:architect
+
 
 Rijksmonumentnummer:
 
