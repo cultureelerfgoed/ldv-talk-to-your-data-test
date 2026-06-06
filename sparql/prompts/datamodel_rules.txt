@@ -604,3 +604,34 @@ OUTPUTREGELS
   - ?choNummer
 - Voeg waar mogelijk ?naam, ?woonplaats, ?adres of ?locatienaam toe.
 - Gebruik LIMIT 50 als geen ander aantal is gevraagd.
+
+GEOMETRIE
+
+Gebruik GeoSPARQL voor geometrie.
+
+Prefix:
+
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+
+Correct patroon:
+
+?cho ceo:heeftGeometrie/geo:asWKT ?wkt .
+
+Gebruik bij kaartvragen altijd variabele ?wkt.
+
+Voor kaartvragen of vragen met woorden zoals:
+- kaart
+- geometrie
+- locatie op kaart
+- toon op kaart
+- waar liggen
+
+voeg toe:
+
+OPTIONAL {
+  ?cho ceo:heeftGeometrie/geo:asWKT ?wkt .
+}
+
+Of verplicht als de gebruiker expliciet een kaart wil:
+
+?cho ceo:heeftGeometrie/geo:asWKT ?wkt .
