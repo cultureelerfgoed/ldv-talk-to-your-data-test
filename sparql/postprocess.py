@@ -13,17 +13,48 @@ Verantwoordelijkheden:
 import re
 import logging
 
-from config import SPARQL_PREFIXES, PROVINCIE_URI
+from config import PROVINCIE_URI
 
 logger = logging.getLogger(__name__)
 
 
+REQUIRED_PREFIXES = {
+    "ceo:": "PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>",
+    "graph:": "PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>",
+    "skos:": "PREFIX skos: <http://www.w3.org/2004/02/skos/core#>",
+    "rdf:": "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+    "rdfs:": "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+    "xsd:": "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>",
+    "geo:": "PREFIX geo: <http://www.opengis.net/ont/geosparql#>",
+    "gsp:": "PREFIX gsp: <http://www.opengis.net/ont/geosparql#>",
+    "geof:": "PREFIX geof: <http://www.opengis.net/def/function/geosparql/>",
+}
+
+
+def _declared_prefixes(query: str) -> set[str]:
+    """Geef alle prefixnamen terug die al gedeclareerd zijn."""
+    return {
+        match.group(1) + ":"
+        for match in re.finditer(
+            r"^\s*PREFIX\s+([A-Za-z][\w-]*)\s*:",
+            query,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+    }
+
+
 def inject_prefixes(query: str) -> str:
-    """Voeg verplichte prefixen toe als ze ontbreken."""
-    if "PREFIX ceo:" not in query:
-        return SPARQL_PREFIXES + "\n\n" + query
-    if "PREFIX rdfs:" not in query and "rdfs:" in query:
-        return "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" + query
+    """Voeg gebruikte prefixen toe als ze ontbreken."""
+    declared = _declared_prefixes(query)
+    additions: list[str] = []
+
+    for prefix, declaration in REQUIRED_PREFIXES.items():
+        if prefix in query and prefix not in declared:
+            additions.append(declaration)
+
+    if additions:
+        return "\n".join(additions) + "\n\n" + query
+
     return query
 
 
@@ -39,29 +70,35 @@ def has_count(query: str) -> bool:
 
 def fix_provincie_pad(query: str) -> str:
     """
-    Zorg dat heeftProvincie altijd via rdfs:label loopt.
+    Zorg dat heeftProvincie altijd via rdfs:label loopt als het model een variabele gebruikt.
 
     Als het LLM alleen ?brr ceo:heeftProvincie ?prov . genereert
     zonder rdfs:label stap, voeg die dan toe.
     """
     if "heeftProvincie" not in query:
         return query
+
     if "provURI" in query or "rdfs:label" in query:
         return query
+
     query = re.sub(
         r"([?]\w+)\s+ceo:heeftProvincie\s+([?]\w+)\s*\.",
         lambda m: (
-            m.group(1) + " ceo:heeftProvincie ?provURI . "
-            "?provURI rdfs:label " + m.group(2) + " ."
+            m.group(1)
+            + " ceo:heeftProvincie ?provURI .\n"
+            + "?provURI rdfs:label "
+            + m.group(2)
+            + " ."
         ),
         query,
     )
+
     return query
 
 
 def normalize_provincie_uri(query: str) -> str:
     """
-    Vervang het provincie-filterpad door een directe URI match.
+    Vervang provincie-label-filter door directe URI match.
 
     Van:
       ?provURI rdfs:label ?provincie .
@@ -77,37 +114,51 @@ def normalize_provincie_uri(query: str) -> str:
     if not m:
         return query
 
-    ctx = query[max(0, m.start() - 100) : m.end() + 10]
-    if not any(x in ctx.lower() for x in ["provinci", "provlabel"]):
+    ctx = query[max(0, m.start() - 150): m.end() + 50].lower()
+
+    if not any(x in ctx for x in ["provinci", "provlabel", "provuri"]):
         return query
 
     zoekterm = m.group(1).lower().strip()
     uri = PROVINCIE_URI.get(zoekterm)
+
     if not uri:
         logger.warning("Onbekende provincie: '%s' — filter niet genormaliseerd", zoekterm)
         return query
 
     logger.info("Provincie '%s' genormaliseerd naar URI: %s", zoekterm, uri)
+
     lines = query.split("\n")
-    lines = [l for l in lines if not ("rdfs:label" in l and "provinci" in l.lower())]
-    lines = [l for l in lines if not ("FILTER" in l and "provinci" in l.lower())]
+    lines = [
+        line
+        for line in lines
+        if not ("rdfs:label" in line and "provinci" in line.lower())
+    ]
+    lines = [
+        line
+        for line in lines
+        if not ("FILTER" in line and "provinci" in line.lower())
+    ]
+
     query = "\n".join(lines)
+
     query = re.sub(
         r"ceo:heeftProvincie\s+[?]\w+\s*\.",
         "ceo:heeftProvincie <" + uri + "> .",
         query,
     )
+
     return query
 
 
 def fix_label_filter(query: str) -> str:
     """
-    Vervang FILTER(LCASE(?x) = "waarde") door FILTER(CONTAINS(LCASE(?x), "waarde")).
-    Taalgelabelde strings kunnen niet met = vergeleken worden.
+    Vervang FILTER(LCASE(?x) = "waarde") door CONTAINS-variant.
+    Taalgelabelde strings kunnen niet altijd netjes met = vergeleken worden.
     """
     return re.sub(
-        r"FILTER\s*\(\s*LCASE\s*\((\?\w+)\)\s*=\s*(\"[\w\s]+\")\s*\)",
-        lambda m: "FILTER(CONTAINS(LCASE(" + m.group(1) + "), " + m.group(2) + "))",
+        r"FILTER\s*\(\s*LCASE\s*\(\s*STR\s*\((\?\w+)\)\s*\)\s*=\s*(\"[^\"]+\")\s*\)",
+        lambda m: "FILTER(CONTAINS(LCASE(STR(" + m.group(1) + ")), " + m.group(2) + "))",
         query,
         flags=re.IGNORECASE,
     )
@@ -123,13 +174,16 @@ def postprocess(query: str, mode: str) -> str:
     3. Fix provincie pad
     4. Normaliseer provincie naar URI
     5. Fix label filters
-    6. Verwijder LIMIT (als lijst-modus) — altijd als laatste
+    6. Inject prefixen opnieuw, want fixes kunnen rdfs toevoegen
+    7. Verwijder LIMIT in lijstmodus
     """
     query = query.replace("```sparql", "").replace("```", "").strip()
+
     query = inject_prefixes(query)
     query = fix_provincie_pad(query)
     query = normalize_provincie_uri(query)
     query = fix_label_filter(query)
+    query = inject_prefixes(query)
 
     if mode == "lijst":
         query = remove_limit(query)
