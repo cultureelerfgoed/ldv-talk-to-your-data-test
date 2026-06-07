@@ -448,6 +448,16 @@ OPTIONAL {
 
 RUIMTELIJKE PERFORMANCE
 
+Bij rijksmonumenten binnen een gezicht:
+filter het Gezicht altijd eerst op naam voordat geof:sfWithin wordt gebruikt.
+Gebruik dus verplicht:
+?gezicht ceo:heeftNaam ?gezichtNaamNode .
+?gezichtNaamNode ceo:naam ?gezichtsnaam .
+FILTER(CONTAINS(LCASE(STR(?gezichtsnaam)), "dordrecht"))
+
+Doe dit vóór:
+FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
+
 Bij geof:sfWithin of geof:sfIntersects:
 
 * beperk eerst het gebiedobject vóór de geometrische vergelijking
@@ -467,3 +477,4 @@ FILTER(CONTAINS(LCASE(STR(?gezichtsnaam)), "dordrecht"))
 FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
 
 Beperk geometrische vergelijkingen altijd zo vroeg mogelijk.
+
