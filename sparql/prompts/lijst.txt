@@ -240,3 +240,41 @@ Fallback:
 Als geof:sfWithin geen resultaten geeft, gebruik:
 
 FILTER(geof:sfIntersects(?rmWkt, ?gezichtWkt))
+
+GEOSPATIAL + FUNCTIE
+
+Als de gebruiker vraagt naar rijksmonumenten binnen een Gezicht én een functie/type, zoals kerk:
+
+- Gebruik eerst het Gezicht-patroon met geof:sfWithin.
+- Voeg daarna een UNION toe voor oorspronkelijke functie, huidige functie en type.
+- Selecteer ?bron en ?functieLabel.
+- Filter niet op één functiepad alleen.
+
+Voorbeeld:
+
+{
+  {
+    ?rm ceo:heeftOorspronkelijkeFunctie ?functieObj .
+    ?functieObj ceo:heeftFunctieNaam ?functieConcept .
+    ?functieConcept skos:prefLabel ?functieLabel .
+    FILTER(CONTAINS(LCASE(STR(?functieLabel)), "kerk"))
+    BIND("oorspronkelijke functie" AS ?bron)
+  }
+  UNION
+  {
+    ?rm ceo:heeftHuidigeFunctie ?functieObj .
+    ?functieObj ceo:heeftFunctieNaam ?functieConcept .
+    ?functieConcept skos:prefLabel ?functieLabel .
+    FILTER(CONTAINS(LCASE(STR(?functieLabel)), "kerk"))
+    BIND("huidige functie" AS ?bron)
+  }
+  UNION
+  {
+    ?rm ceo:heeftKennisregistratie ?typeObj .
+    ?typeObj a ceo:Type .
+    ?typeObj ceo:heeftTypeNaam ?typeConcept .
+    ?typeConcept skos:prefLabel ?functieLabel .
+    FILTER(CONTAINS(LCASE(STR(?functieLabel)), "kerk"))
+    BIND("type" AS ?bron)
+  }
+}
