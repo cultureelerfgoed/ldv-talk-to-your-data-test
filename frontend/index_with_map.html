@@ -1724,7 +1724,6 @@ function initResultMap(bindings, vars) {
   }
 
   setTimeout(() => currentMap.invalidateSize(), 100);
-  setTimeout(() => currentMap.invalidateSize(), 500);
 }
 
 
@@ -1767,7 +1766,6 @@ function renderResultsCard(sparqlResults, elapsed) {
         </div>
 
         <div id="cardsView" class="result-cards">
-          ${renderMapCard(bindings, vars)}
           ${renderResultCards(bindings, vars)}
         </div>
 
@@ -1777,7 +1775,7 @@ function renderResultsCard(sparqlResults, elapsed) {
 
         <div class="meta-bar">
           <span>${escapeHTML(elapsed)}s</span>
-          ${bindings.length > 12 ? '<span>eerste 12 als kaarten getoond</span>' : ''}
+          ${bindings.length > 12 ? '<span>eerste 12 als kaart getoond</span>' : ''}
           ${bindings.length > 50 ? '<span>eerste 50 in tabel getoond</span>' : ''}
         </div>
       </div>
