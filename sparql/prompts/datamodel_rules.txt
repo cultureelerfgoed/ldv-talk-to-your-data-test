@@ -402,3 +402,49 @@ Bij vragen over monumenten binnen een Gezicht:
 6. Als sfWithin geen resultaten geeft:
    - probeer geof:sfIntersects
    - of geef een tussenmelding dat de geometrische koppeling geen resultaat opleverde.
+
+   NUMMERS EN IDENTIFICATIE
+
+Gebruik het juiste nummer-property per objecttype.
+
+Rijksmonumenten:
+- ceo:rijksmonumentnummer
+
+Gezichten:
+- ceo:gezichtsnummer
+
+Werelderfgoed:
+- ceo:werelderfgoednummer
+
+Complexen:
+- ceo:complexnummer
+
+Archeologische complexen:
+- ceo:archis2Complexnummer
+
+Archeologische terreinen:
+- ceo:archis2Monumentnummer
+
+Vondstlocaties:
+- ceo:archis2Vondstmeldingsnummer
+- ceo:archis2Waarnemingsnummer
+
+Algemeen CHO-objectnummer:
+- ceo:cultuurhistorischObjectnummer
+
+Belangrijk:
+Gebruik ceo:cultuurhistorischObjectnummer NIET voor Rijksmonumenten tenzij de gebruiker expliciet vraagt naar CHO-nummer of cultuurhistorisch objectnummer.
+
+Bij vragen zoals:
+- "rijksmonument nummer 1"
+- "rijksmonument met nummer 1"
+- "monumentnummer 1"
+
+gebruik altijd:
+
+?rm a ceo:Rijksmonument .
+?rm ceo:rijksmonumentnummer "1" .
+
+Niet:
+
+?rm ceo:cultuurhistorischObjectnummer "1" .
