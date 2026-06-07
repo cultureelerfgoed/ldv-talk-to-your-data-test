@@ -44,6 +44,23 @@ WHERE {
 }
 LIMIT 20
 
+NUMMERFILTERS
+
+Bij vragen naar een specifiek rijksmonumentnummer:
+
+?rm a ceo:Rijksmonument .
+?rm ceo:rijksmonumentnummer "1" .
+
+Gebruik voor Rijksmonumenten nooit ceo:cultuurhistorischObjectnummer als de gebruiker vraagt naar:
+- rijksmonumentnummer
+- monumentnummer
+- nummer van het rijksmonument
+
+Gebruik ceo:cultuurhistorischObjectnummer alleen bij:
+- archeologische objecten
+- CHO-objecten
+- expliciete vragen naar cultuurhistorisch objectnummer
+
 OBJECTPROPERTIES:
 - ceo:heeft... verwijst naar een URI of node.
 - ceo:is...Van verwijst naar een URI of node.
