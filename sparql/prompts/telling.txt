@@ -211,3 +211,37 @@ OUTPUT:
 - Simpele telling: SELECT (COUNT(DISTINCT ?hoofdobject) AS ?aantal)
 - Gegroepeerde telling: SELECT ?kenmerk (COUNT(DISTINCT ?hoofdobject) AS ?aantal)
 - Gebruik de aanvullende kennis uit datamodel_rules.txt voor classes, property paths, ActorEnRol, monumentaard, archeologie, gezichten, werelderfgoed, geometrie en SKOS-concepten.
+
+ARCHEOLOGISCHE TELLINGEN
+
+Romeinse vondsten tellen:
+
+?vondst a ceo:Vondsten .
+?vondst ceo:ligtInObject ?vondstlocatie .
+?vondstlocatie a ceo:Vondstlocatie .
+
+?vondstlocatie ceo:heeftBasisregistratieRelatie ?relatie .
+?relatie ceo:heeftBAGRelatie ?bag .
+?bag ceo:woonplaatsnaam ?woonplaats .
+
+FILTER(CONTAINS(LCASE(STR(?woonplaats)), "nuth"))
+
+?vondst ceo:heeftGebeurtenis ?gebeurtenis .
+?gebeurtenis ceo:heeftDatering ?datering .
+
+{
+  ?datering ceo:heeftBeginDatering ?begin .
+  ?begin ceo:heeftPeriode ?periode .
+  ?periode skos:prefLabel ?periodeLabel .
+}
+UNION
+{
+  ?datering ceo:heeftEindDatering ?eind .
+  ?eind ceo:heeftPeriode ?periode .
+  ?periode skos:prefLabel ?periodeLabel .
+}
+
+FILTER(CONTAINS(LCASE(STR(?periodeLabel)), "romeinse"))
+
+Gebruik:
+SELECT (COUNT(DISTINCT ?vondst) AS ?aantal)

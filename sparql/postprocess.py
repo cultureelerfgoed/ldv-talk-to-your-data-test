@@ -191,6 +191,8 @@ def postprocess(query: str, mode: str) -> str:
     7. Verwijder LIMIT in lijstmodus
     """
     query = query.replace("```sparql", "").replace("```", "").strip()
+    if is_incomplete_query(query):
+        raise ValueError("De gegenereerde SPARQL-query is onvolledig afgekapt.")
 
     query = inject_prefixes(query)
     query = fix_provincie_pad(query)
