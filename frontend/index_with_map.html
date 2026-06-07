@@ -1466,8 +1466,19 @@ function renderTable(bindings, vars) {
 
 
 function findGeometryVars(vars) {
-  const candidates = ['wkt', 'geometrie', 'geometry', 'geo', 'geom'];
-  return vars.filter(v => candidates.includes(v.toLowerCase()));
+  return vars.filter(v => {
+    const name = v.toLowerCase();
+
+    return (
+      name === 'wkt' ||
+      name === 'geometrie' ||
+      name === 'geometry' ||
+      name === 'geo' ||
+      name === 'geom' ||
+      name.includes('wkt') ||
+      name.startsWith('geo')
+    );
+  });
 }
 
 function stripCrsFromWkt(wkt) {
@@ -1649,8 +1660,10 @@ function parseWktToLayers(rawWkt, popupHtml) {
 
 function popupForRow(row, vars) {
   const title = escapeHTML(chooseTitle(row, vars));
+  const geometryVars = findGeometryVars(vars);
+
   const fields = vars
-    .filter(v => row[v] && row[v].value && !['wkt', 'geometrie', 'geometry', 'geo', 'geom'].includes(v.toLowerCase()))
+    .filter(v => row[v] && row[v].value && !geometryVars.includes(v))
     .slice(0, 5)
     .map(v => `<div><strong>${escapeHTML(v)}:</strong> ${formatValue(row[v])}</div>`)
     .join('');
@@ -1679,7 +1692,7 @@ function renderMapCard(bindings, vars) {
       </div>
       <div id="resultMap" class="map-wrap"></div>
       <div class="map-note">
-        De kaart wordt automatisch getoond omdat de query WKT-geometrie teruggeeft. RD-coördinaten worden in de browser benaderd naar WGS84.
+        De kaart wordt automatisch getoond omdat de query WKT-geometrie teruggeeft. Herkent onder meer ?wkt, ?rmWkt, ?gezichtWkt, ?geogez en ?geormn.
       </div>
     </div>
   `;
@@ -1724,6 +1737,7 @@ function initResultMap(bindings, vars) {
   }
 
   setTimeout(() => currentMap.invalidateSize(), 100);
+  setTimeout(() => currentMap.invalidateSize(), 500);
 }
 
 
@@ -1757,6 +1771,8 @@ function renderResultsCard(sparqlResults, elapsed) {
         <h4>Resultaten</h4>
       </div>
       <div class="card-body">
+        ${renderMapCard(bindings, vars)}
+
         <div class="result-toolbar">
           <div class="result-count">${escapeHTML(rowText)} gevonden</div>
           <div class="toolbar-actions">
@@ -1775,7 +1791,7 @@ function renderResultsCard(sparqlResults, elapsed) {
 
         <div class="meta-bar">
           <span>${escapeHTML(elapsed)}s</span>
-          ${bindings.length > 12 ? '<span>eerste 12 als kaart getoond</span>' : ''}
+          ${bindings.length > 12 ? '<span>eerste 12 als kaarten getoond</span>' : ''}
           ${bindings.length > 50 ? '<span>eerste 50 in tabel getoond</span>' : ''}
         </div>
       </div>
@@ -1931,4 +1947,3 @@ document.getElementById('question').addEventListener('keydown', function(e) {
 </script>
 </body>
 </html>
-#test
