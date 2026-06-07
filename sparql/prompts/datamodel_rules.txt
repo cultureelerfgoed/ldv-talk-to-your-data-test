@@ -14,6 +14,7 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 
 Gebruik nooit:
 - ceosp:
@@ -32,6 +33,78 @@ ALGEMENE REGELS
 - Gebruik DISTINCT bij tellingen met joins.
 - Gebruik OPTIONAL voor naam, omschrijving, adres, type, functie en geometrie.
 - Gebruik geen SELECT *.
+
+OBJECTPROPERTIES EN DATATYPEPROPERTIES
+
+In de CEO geldt als vuistregel:
+
+- properties die beginnen met ceo:heeft... zijn objectproperties
+- properties met patroon ceo:is...Van zijn objectproperties
+- objectproperties verwijzen naar een URI of resource
+- objectproperties hebben meestal een vervolgstap nodig
+- filter niet direct op ceo:heeft... alsof het een tekstwaarde is
+
+Fout:
+
+?cho ceo:heeftNaam ?naam .
+FILTER(CONTAINS(LCASE(STR(?naam)), "rijksmuseum"))
+
+Goed:
+
+?cho ceo:heeftNaam ?naamNode .
+?naamNode ceo:naam ?naam .
+FILTER(CONTAINS(LCASE(STR(?naam)), "rijksmuseum"))
+
+Fout:
+
+?cho ceo:heeftOmschrijving ?omschrijving .
+
+Goed:
+
+?cho ceo:heeftOmschrijving ?omschrijvingNode .
+?omschrijvingNode ceo:omschrijving ?omschrijving .
+
+Fout:
+
+?cho ceo:heeftMonumentAard ?aard .
+FILTER(CONTAINS(LCASE(STR(?aard)), "archeologisch"))
+
+Goed:
+
+?cho ceo:heeftMonumentAard ?aardConcept .
+?aardConcept skos:prefLabel ?aard .
+FILTER(LCASE(STR(?aard)) = "archeologisch")
+
+Fout:
+
+?cho ceo:heeftGeometrie ?wkt .
+
+Goed:
+
+?cho ceo:heeftGeometrie ?geometrie .
+?geometrie geo:asWKT ?wkt .
+
+Of verkort:
+
+?cho ceo:heeftGeometrie/geo:asWKT ?wkt .
+
+Datatypeproperties geven literals terug, zoals tekst, datum, nummer of boolean.
+
+Voorbeelden van datatypeproperties:
+- ceo:naam
+- ceo:omschrijving
+- ceo:rijksmonumentnummer
+- ceo:cultuurhistorischObjectnummer
+- ceo:registratiedatum
+- ceo:datumInschrijvingInMonumentenregister
+- ceo:gezichtsnummer
+- ceo:werelderfgoednummer
+- ceo:bijzonderGebied
+- ceo:aantalVondsten
+- ceo:aantalGrondsporen
+- ceo:internationaalKenteken
+
+Alleen op datatypeproperties filter je direct met STR(), CONTAINS(), REGEX(), datumvergelijking of numerieke vergelijking.
 
 GELDIGE HOOFDCLASSES
 
@@ -55,6 +128,10 @@ GELDIGE HOOFDCLASSES
 - ceo:Materiaal
 - ceo:Geometrie
 - ceo:Kennisregistratie
+- ceo:ActorEnRol
+- ceo:StijlEnCultuur
+- ceo:Werelderfgoed
+- ceo:Gezicht
 
 VERBODEN TERMEN
 
@@ -70,6 +147,34 @@ Gebruik nooit:
 
 SEMANTISCHE INTERPRETATIE
 
+"beschermd gezicht", "gezicht", "stadsgezicht", "dorpsgezicht"
+→ gebruik ceo:Gezicht
+
+"werelderfgoed", "UNESCO"
+→ gebruik ceo:Werelderfgoed
+
+"omschrijving", "beschrijving", "vrije tekst"
+→ gebruik ceo:heeftOmschrijving/ceo:omschrijving
+→ markeer zoekresultaten uit omschrijving als onzeker met ?bron = "omschrijving (onzeker)"
+
+SEMANTISCHE VERTALINGEN
+
+Als de gebruiker vraagt naar:
+- "blauw-wit schildje"
+- "blauw witte schildjes"
+- "internationaal kenteken"
+- "Haags Verdrag schildje"
+
+gebruik:
+
+?cho ceo:internationaalKenteken true .
+
+Zoek niet op de letterlijke tekst "blauw-wit schildje".
+Deze term staat niet als label of vrije tekst in de data.
+
+"architect", "ontwerper", "bouwmeester", "bouwkundige", "constructeur"
+→ gebruik primair ceo:Gebeurtenis/ceo:heeftActorEnRol
+→ gebruik niet ceo:architect
 
 "stijl"
 → gebruik ceo:StijlEnCultuur
@@ -93,6 +198,21 @@ SEMANTISCHE INTERPRETATIE
 → filter met ceo:heeftMonumentAard
 → skos:prefLabel = "onroerend gebouwd"
 
+SEMANTISCHE VERTALINGEN
+
+Als de gebruiker vraagt naar:
+- "blauw-wit schildje"
+- "blauw witte schildjes"
+- "internationaal kenteken"
+- "Haags Verdrag schildje"
+
+gebruik:
+
+?cho ceo:internationaalKenteken true .
+
+Zoek niet op de letterlijke tekst "blauw-wit schildje".
+Deze term staat niet als label of vrije tekst in de data.
+
 BASISREGISTRATIE EN LOCATIE
 
 Provincie staat niet direct op een cultuurhistorisch object.
@@ -110,7 +230,8 @@ Gebruik nooit:
 Gemeente loopt ook via basisregistratie:
 
 ?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
-?basisrelatie ceo:heeftGemeente ?gemeente .
+?basisrelatie ceo:heeftBRKRelatie ?brk .
+?brk ceo:gemeentenaam ?gemeente .
 
 Adres en woonplaats lopen via BAGRelatie:
 
@@ -167,451 +288,34 @@ OPTIONAL {
 }
 
 Omschrijving is vrije tekst.
-Gebruik omschrijving alleen voor tonen of als laatste redmiddel voor zoeken.
+Gebruik omschrijving voor tonen of als laatste redmiddel voor zoeken.
+
+Vrije tekst kan informatie bevatten over:
+- architecten
+- ontwerpers
+- bouwjaar
+- stijl
+- functie
+- complexcontext
+- stedenbouwkundige context
+
+Gebruik gestructureerde paden eerst.
+Zoek pas in omschrijving als er geen betrouwbaar gestructureerd pad is of als de gebruiker expliciet naar tekst/omschrijving vraagt.
+
 Als een resultaat alleen via omschrijving matcht, voeg toe:
 
 BIND("omschrijving (onzeker)" AS ?bron)
 
-LOCATIEAANDUIDING
-
-Locatieaanduiding staat op een ceo:LocatieAanduiding-node.
-
-Correct patroon:
-
-OPTIONAL {
-  ?cho ceo:heeftLocatieAanduiding ?locatie .
-  OPTIONAL { ?locatie ceo:locatienaam ?locatienaam . }
-  OPTIONAL { ?locatie ceo:locatieomschrijving ?locatieomschrijving . }
-}
-
-AACTOREN EN ROLLEN
-
-Gebruik geen ceo:architect.
-Architectinformatie loopt via ceo:Gebeurtenis en ceo:ActorEnRol.
-
-CEO-patroon:
-
-?cho ceo:heeftGebeurtenis ?gebeurtenis .
-?gebeurtenis ceo:heeftActorEnRol ?actorEnRol .
-?actorEnRol ceo:heeftActor ?actor .
-?actorEnRol ceo:heeftRol ?rol .
-
-Volgens de CEO hebben ceo:heeftActor en ceo:heeftRol range skos:Concept,
-maar in de huidige instance-data kunnen deze waarden literals zijn.
-Gebruik daarom STR() bij filters.
-
-Voor vragen met:
-- architect
-- ontwerper
-- bouwmeester
-- bouwkundige
-- constructeur
-
-filter op ceo:heeftRol:
-
-FILTER(CONTAINS(LCASE(STR(?rol)), "architect"))
-
-Voor vragen naar een specifieke persoon of organisatie als actor,
-filter op ceo:heeftActor:
-
-FILTER(CONTAINS(LCASE(STR(?actor)), "kramer"))
-
-Vraagpatroon:
-"Van welk rijksmonument is Kramer, Hendrik de architect?"
-
-Correct querypatroon:
-
-SELECT DISTINCT ?cho ?rijksmonumentnummer ?naam ?actor ?rol
-WHERE {
-  ?cho a ceo:Rijksmonument .
-
-  ?cho ceo:heeftGebeurtenis ?gebeurtenis .
-  ?gebeurtenis ceo:heeftActorEnRol ?actorEnRol .
-  ?actorEnRol ceo:heeftActor ?actor .
-  ?actorEnRol ceo:heeftRol ?rol .
-
-  FILTER(CONTAINS(LCASE(STR(?actor)), "kramer"))
-  FILTER(CONTAINS(LCASE(STR(?rol)), "architect"))
-
-  OPTIONAL { ?cho ceo:rijksmonumentnummer ?rijksmonumentnummer . }
-
-  OPTIONAL {
-    ?cho ceo:heeftNaam ?naamNode .
-    ?naamNode ceo:naam ?naam .
-  }
-}
-LIMIT 50
-
-MONUMENTAARD
-
-ceo:heeftMonumentAard geeft de aard van een rijksmonument aan.
-De waarde is een skos:Concept.
-
-De relevante skos:prefLabel waarden zijn:
-- "onroerend gebouwd"
-- "archeologisch"
-
-Archeologische rijksmonumenten:
-
-?cho ceo:heeftMonumentAard ?monumentaard .
-?monumentaard skos:prefLabel ?monumentaardLabel .
-FILTER(
-  LCASE(STR(?monumentaardLabel)) = "archeologisch"
-)
-
-Gebouwde rijksmonumenten:
-
-?cho ceo:heeftMonumentAard ?monumentaard .
-?monumentaard skos:prefLabel ?monumentaardLabel .
-FILTER(
-  LCASE(STR(?monumentaardLabel)) = "onroerend gebouwd"
-)
-
-Gebruik voor "archeologische rijksmonumenten" altijd ceo:heeftMonumentAard.
-Gebruik niet ceo:ArcheologischTerrein of ceo:ArcheologischComplex, tenzij de gebruiker expliciet naar terreinen of complexen vraagt.
-
-RIJKSMONUMENTEN
-
-Class:
-
-?cho a ceo:Rijksmonument .
-
-Bewezen directe properties op ceo:Rijksmonument:
-- ceo:cultuurhistorischObjectnummer
-- ceo:rijksmonumentnummer
-- ceo:datumInschrijvingInMonumentenregister
-- ceo:registratiedatum
-- ceo:heeftBasisregistratieRelatie
-- ceo:heeftGeometrie
-- ceo:heeftJuridischeStatus
-- ceo:heeftKennisregistratie
-- ceo:heeftLocatieAanduiding
-- ceo:heeftMonumentAard
-- ceo:heeftNaam
-- ceo:heeftOmschrijving
-- ceo:heeftOorspronkelijkeFunctie
-- ceo:isHoofdobjectVanComplex
-- ceo:isOnderdeelVanComplex
-
-
-Rijksmonumentnummer:
-
-OPTIONAL { ?cho ceo:rijksmonumentnummer ?rijksmonumentnummer . }
-
-Cultuurhistorisch objectnummer:
-
-OPTIONAL { ?cho ceo:cultuurhistorischObjectnummer ?choNummer . }
-
-Rijksmonumenten in provincie:
-
-SELECT ?cho ?rijksmonumentnummer ?naam ?woonplaats ?adres
-WHERE {
-  ?cho a ceo:Rijksmonument .
-
-  ?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
-  ?basisrelatie ceo:heeftProvincie <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)> .
-
-  OPTIONAL { ?cho ceo:rijksmonumentnummer ?rijksmonumentnummer . }
-
-  OPTIONAL {
-    ?cho ceo:heeftNaam ?naamNode .
-    ?naamNode ceo:naam ?naam .
-  }
-
-  OPTIONAL {
-    ?basisrelatie ceo:heeftBAGRelatie ?bag .
-    OPTIONAL { ?bag ceo:woonplaatsnaam ?woonplaats . }
-    OPTIONAL { ?bag ceo:volledigAdres ?adres . }
-  }
-}
-LIMIT 50
-
-Archeologische rijksmonumenten in provincie:
-
-SELECT (COUNT(DISTINCT ?cho) AS ?aantal)
-WHERE {
-  ?cho a ceo:Rijksmonument .
-
-  ?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
-  ?basisrelatie ceo:heeftProvincie <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)> .
-
-  ?cho ceo:heeftMonumentAard ?monumentaard .
-  ?monumentaard skos:prefLabel ?monumentaardLabel .
-
-  FILTER(
-      LCASE(STR(?monumentaardLabel)) = "archeologisch"
-  )
-}
-
-COMPLEXEN
-
-Class:
-
-?complex a ceo:Complex .
-
-Bewezen directe properties op ceo:Complex:
-- ceo:complexnummer
-- ceo:cultuurhistorischObjectnummer
-- ceo:heeftHoofdobject
-- ceo:heeftKennisregistratie
-- ceo:heeftNaam
-- ceo:heeftRijksmonument
-- ceo:registratiedatum
-
-Complexen hebben geen bewezen directe locatie.
-Gebruik gekoppelde rijksmonumenten of hoofdobject voor locatievragen.
-
-Complexen in provincie:
-
-SELECT DISTINCT ?complex ?complexnummer ?naam
-WHERE {
-  ?complex a ceo:Complex .
-  ?complex ceo:heeftRijksmonument ?rijksmonument .
-
-  ?rijksmonument ceo:heeftBasisregistratieRelatie ?basisrelatie .
-  ?basisrelatie ceo:heeftProvincie <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)> .
-
-  OPTIONAL { ?complex ceo:complexnummer ?complexnummer . }
-
-  OPTIONAL {
-    ?complex ceo:heeftNaam ?naamNode .
-    ?naamNode ceo:naam ?naam .
-  }
-}
-LIMIT 50
-
-ARCHEOLOGISCHE COMPLEXEN
-
-Class:
-
-?complex a ceo:ArcheologischComplex .
-
-Gebruik nooit:
-
-?complex a ceo:ArcheologischeComplexen .
-
-Bewezen directe properties op ceo:ArcheologischComplex:
-- ceo:cultuurhistorischObjectnummer
-- ceo:heeftGebeurtenis
-- ceo:heeftKennisregistratie
-- ceo:heeftType
-- ceo:ligtInObject
-- ceo:registratiedatum
-
-Een ceo:ArcheologischComplex heeft in de instance-data geen bewezen directe basisregistratie.
-Gebruik voor locatie/provincie het bovenliggende onderzoeksgebied via ceo:ligtInObject.
-
-Correct locatiepad:
-
-?complex ceo:ligtInObject ?onderzoeksgebied .
-?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
-?onderzoeksgebied ceo:heeftBasisregistratieRelatie ?basisrelatie .
-?basisrelatie ceo:heeftProvincie <PROVINCIE_URI> .
-
-Gebruik niet:
-
-?complex ceo:heeftBasisregistratieRelatie ?basisrelatie .
-?complex ceo:heeftProvincie <PROVINCIE_URI> .
-
-ARCHEOLOGISCHE TERREINEN
-
-Class:
-
-?terrein a ceo:ArcheologischTerrein .
-
-Bewezen directe properties op ceo:ArcheologischTerrein:
-- ceo:archis2Monumentnummer
-- ceo:bevatObject
-- ceo:cultuurhistorischObjectnummer
-- ceo:heeftArcheologischeWaardering
-- ceo:heeftBasisregistratieRelatie
-- ceo:heeftKennisregistratie
-- ceo:heeftLocatieAanduiding
-- ceo:heeftOmschrijving
-- ceo:heeftVertrouwelijkAanduiding
-- ceo:registratiedatum
-
-Archeologische terreinen kunnen direct via basisregistratie naar provincie.
-
-ARCHEOLOGISCHE ONDERZOEKSGEBIEDEN
-
-Class:
-
-?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
-
-Bewezen directe properties:
-- ceo:cultuurhistorischObjectnummer
-- ceo:heeftBasisregistratieRelatie
-- ceo:heeftGeometrie
-- ceo:heeftVertrouwelijkAanduiding
-- ceo:registratiedatum
-
-Onderzoeksgebieden kunnen direct via basisregistratie naar provincie.
-
-VONDSTEN
-
-Class:
-
-?vondst a ceo:Vondsten .
-
-Bewezen directe properties op ceo:Vondsten:
-- ceo:aantalVondsten
-- ceo:cultuurhistorischObjectnummer
-- ceo:heeftGebeurtenis
-- ceo:heeftKennisregistratie
-- ceo:heeftMateriaal
-- ceo:heeftToestand
-- ceo:heeftType
-- ceo:ligtInObject
-- ceo:registratiedatum
-
-Vondsten liggen in een vondstlocatie:
-
-?vondst ceo:ligtInObject ?vondstlocatie .
-
-Gebruik voor telling van vondsten meestal SUM(?aantalVondsten), niet COUNT(?vondst), als de vraag gaat over aantallen vondsten.
-
-GRONDSPOREN
-
-Class:
-
-?grondspoor a ceo:Grondsporen .
-
-Bewezen directe properties op ceo:Grondsporen:
-- ceo:aantalGrondsporen
-- ceo:cultuurhistorischObjectnummer
-- ceo:heeftGebeurtenis
-- ceo:heeftKennisregistratie
-- ceo:heeftType
-- ceo:ligtInObject
-- ceo:registratiedatum
-
-Grondsporen liggen in een vondstlocatie:
-
-?grondspoor ceo:ligtInObject ?vondstlocatie .
-
-Gebruik voor telling van grondsporen meestal SUM(?aantalGrondsporen), niet COUNT(?grondspoor), als de vraag gaat over aantallen grondsporen.
-
-FUNCTIES
-
-Functie-node:
-
-?functie a ceo:Functie .
-
-Bewezen properties op ceo:Functie:
-- rdf:type ceo:Functie
-- rdf:type ceo:Kennisregistratie
-- ceo:formeelStandpunt
-- ceo:heeftBetrekkingOp
-- ceo:heeftFunctieNaam
-- ceo:hoofdfunctie
-- ceo:kennisregistratienummer
-- ceo:registratiedatum
-
-Vanaf rijksmonument naar oorspronkelijke functie:
-
-?cho ceo:heeftOorspronkelijkeFunctie ?functie .
-?functie ceo:heeftFunctieNaam ?functieConcept .
-OPTIONAL { ?functieConcept skos:prefLabel ?functieLabel . }
-
-Via kennisregistratie:
-
-?functie a ceo:Functie ;
-         ceo:heeftBetrekkingOp ?cho ;
-         ceo:heeftFunctieNaam ?functieConcept .
-OPTIONAL { ?functieConcept skos:prefLabel ?functieLabel . }
-
-Zoeken naar kerk via functie:
-
-?cho ceo:heeftOorspronkelijkeFunctie ?functie .
-?functie ceo:heeftFunctieNaam ?functieConcept .
-?functieConcept skos:prefLabel ?functieLabel .
-FILTER(CONTAINS(LCASE(STR(?functieLabel)), "kerk"))
-
-TYPE
-
-Type-node:
-
-?type a ceo:Type .
-
-Algemeen patroon:
-
-?cho ceo:heeftType ?type .
-?type ceo:heeftTypeNaam ?typeConcept .
-OPTIONAL { ?typeConcept skos:prefLabel ?typeLabel . }
-
-Zoeken op type, bijvoorbeeld kasteel:
-
-?cho ceo:heeftType ?type .
-?type ceo:heeftTypeNaam ?typeConcept .
-?typeConcept skos:prefLabel ?typeLabel .
-FILTER(CONTAINS(LCASE(STR(?typeLabel)), "kasteel"))
-
-MATERIAAL
-
-Materiaalpatroon:
-
-?cho ceo:heeftMateriaal ?materiaal .
-?materiaal ceo:heeftMateriaalNaam ?materiaalConcept .
-OPTIONAL { ?materiaalConcept skos:prefLabel ?materiaalLabel . }
-
-GEBEURTENIS
-
-Gebeurtenispatroon:
-
-?cho ceo:heeftGebeurtenis ?gebeurtenis .
-OPTIONAL {
-  ?gebeurtenis ceo:heeftGebeurtenisNaam ?gebeurtenisConcept .
-  OPTIONAL { ?gebeurtenisConcept skos:prefLabel ?gebeurtenisLabel . }
-}
-
-TELLINGEN
-
-Gebruik DISTINCT bij objecttellingen:
-
-SELECT (COUNT(DISTINCT ?cho) AS ?aantal)
-WHERE {
-  ?cho a ceo:Rijksmonument .
-}
-
-Voor objecten met aantalsproperty’s:
-
-Vondsten:
-
-SELECT (SUM(?aantalVondsten) AS ?aantal)
-WHERE {
-  ?vondst a ceo:Vondsten .
-  ?vondst ceo:aantalVondsten ?aantalVondsten .
-}
-
-Grondsporen:
-
-SELECT (SUM(?aantalGrondsporen) AS ?aantal)
-WHERE {
-  ?grondspoor a ceo:Grondsporen .
-  ?grondspoor ceo:aantalGrondsporen ?aantalGrondsporen .
-}
-
-OUTPUTREGELS
-
-- Gebruik geen SELECT *.
-- Geef altijd de URI terug van het hoofdobject.
-- Gebruik duidelijke variabelen.
-- Voeg relevante nummer-velden toe:
-  - ?rijksmonumentnummer
-  - ?complexnummer
-  - ?archis2Monumentnummer
-  - ?choNummer
-- Voeg waar mogelijk ?naam, ?woonplaats, ?adres of ?locatienaam toe.
-- Gebruik LIMIT 50 als geen ander aantal is gevraagd.
+Voorbeeld zoeken in omschrijving naar Cuypers:
+
+?cho ceo:heeftOmschrijving ?omschrijvingNode .
+?omschrijvingNode ceo:omschrijving ?omschrijving .
+FILTER(CONTAINS(LCASE(STR(?omschrijving)), "cuypers"))
+BIND("omschrijving (onzeker)" AS ?bron)
 
 GEOMETRIE
 
 Gebruik GeoSPARQL voor geometrie.
-
-Prefix:
-
-PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 
 Correct patroon:
 
@@ -621,10 +325,12 @@ Gebruik bij kaartvragen altijd variabele ?wkt.
 
 Voor kaartvragen of vragen met woorden zoals:
 - kaart
+- kaartje
 - geometrie
 - locatie op kaart
 - toon op kaart
 - waar liggen
+- ligging
 
 voeg toe:
 
