@@ -116,7 +116,14 @@ def generate_sparql():
 
     data = request.get_json(silent=True) or {}
     question = (data.get("question") or "").strip()
-    mode = data.get("mode")
+    frontend_mode = data.get("mode")
+
+    detected_mode = detect_mode(question)
+
+    if detected_mode == "telling":
+        mode = "telling"
+    else:
+        mode = frontend_mode or "lijst"
 
     if not mode:
         mode = detect_mode(question)

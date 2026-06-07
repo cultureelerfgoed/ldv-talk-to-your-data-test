@@ -93,7 +93,7 @@ def _generate_ollama(question: str, system_prompt: str) -> str:
         options={
             "temperature": 0,
             "num_ctx": int(getattr(config, "OLLAMA_NUM_CTX", 12000)),
-            "num_predict": int(getattr(config, "OLLAMA_NUM_PREDICT", 1200)),
+            "num_predict": int(getattr(config, "OLLAMA_NUM_PREDICT", 1800)),
         },
     )
 
