@@ -111,6 +111,7 @@ def normalize_provincie_uri(query: str) -> str:
         return query
 
     m = re.search(r'FILTER[^"]*"([^"]+)"', query, re.IGNORECASE)
+
     if not m:
         return query
 
@@ -123,21 +124,33 @@ def normalize_provincie_uri(query: str) -> str:
     uri = PROVINCIE_URI.get(zoekterm)
 
     if not uri:
-        logger.warning("Onbekende provincie: '%s' — filter niet genormaliseerd", zoekterm)
+        logger.warning(
+            "Onbekende provincie: '%s' - filter niet genormaliseerd",
+            zoekterm,
+        )
         return query
 
-    logger.info("Provincie '%s' genormaliseerd naar URI: %s", zoekterm, uri)
+    logger.info(
+        "Provincie '%s' genormaliseerd naar URI: %s",
+        zoekterm,
+        uri,
+    )
 
     lines = query.split("\n")
+
     lines = [
         line
         for line in lines
-        if not ("rdfs:label" in line and "provinci" in line.lower())
+        if not (
+            "rdfs:label" in line
+            and re.search(r"\?prov\w*", line, re.IGNORECASE)
+        )
     ]
+
     lines = [
         line
         for line in lines
-        if not ("FILTER" in line and "provinci" in line.lower())
+        if not ("FILTER" in line and zoekterm in line.lower())
     ]
 
     query = "\n".join(lines)
