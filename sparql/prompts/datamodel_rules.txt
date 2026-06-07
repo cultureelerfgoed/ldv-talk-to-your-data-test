@@ -15,6 +15,8 @@ PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX gsp: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 
 Gebruik nooit:
 - ceosp:
@@ -197,21 +199,6 @@ Deze term staat niet als label of vrije tekst in de data.
 → gebruik ceo:Rijksmonument
 → filter met ceo:heeftMonumentAard
 → skos:prefLabel = "onroerend gebouwd"
-
-SEMANTISCHE VERTALINGEN
-
-Als de gebruiker vraagt naar:
-- "blauw-wit schildje"
-- "blauw witte schildjes"
-- "internationaal kenteken"
-- "Haags Verdrag schildje"
-
-gebruik:
-
-?cho ceo:internationaalKenteken true .
-
-Zoek niet op de letterlijke tekst "blauw-wit schildje".
-Deze term staat niet als label of vrije tekst in de data.
 
 BASISREGISTRATIE EN LOCATIE
 
@@ -404,3 +391,14 @@ ORDER BY ?gezichtnummer ?rmn
 
 Gebruik bij voorkeur gsp:asWKT.
 Gebruik geo:asWKT alleen als de query al geo: definieert.
+
+Bij vragen over monumenten binnen een Gezicht:
+
+1. Zoek eerst het Gezicht-object op naam.
+2. Controleer of het Gezicht geometrie heeft.
+3. Zoek daarna Rijksmonumenten met geometrie.
+4. Gebruik pas daarna geof:sfWithin.
+5. Voeg gemeente-filters alleen toe als aanvullende filter.
+6. Als sfWithin geen resultaten geeft:
+   - probeer geof:sfIntersects
+   - of geef een tussenmelding dat de geometrische koppeling geen resultaat opleverde.

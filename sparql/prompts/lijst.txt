@@ -168,3 +168,75 @@ FILTER(
   CONTAINS(LCASE(STR(?omschrijving)), "kerk") ||
   CONTAINS(LCASE(STR(?functie)), "kerk")
 )
+
+Vraag:
+Welke rijksmonumenten liggen binnen het beschermd gezicht Dordrecht?
+
+Strategie:
+- Zoek eerst ceo:Gezicht met naam Dordrecht
+- Gebruik geometrie van het gezicht
+- Zoek Rijksmonumenten met geometrie
+- Gebruik geof:sfWithin
+
+Belangrijk:
+Combineer niet direct gemeente-filter + geometrische relatie in één stap.
+
+Werk van grof naar specifiek.
+Controleer eerst of elk tussenresultaat data oplevert.
+Gebruik OPTIONAL waar mogelijk.
+
+GEOSPATIAL QUERYPATROON: RIJKSMONUMENTEN BINNEN EEN GEZICHT
+
+Gebruik dit patroon als de gebruiker vraagt:
+- welke rijksmonumenten liggen binnen een gezicht
+- welke rijksmonumenten liggen binnen een beschermd gezicht
+- welke monumenten liggen in een stadsgezicht
+- welke monumenten liggen in een dorpsgezicht
+
+Belangrijk:
+- Zoek eerst ceo:Gezicht via ceo:heeftNaam/ceo:naam.
+- Gebruik geometrie via ceo:heeftGeometrie/gsp:asWKT.
+- Gebruik niet geo:hasGeometry.
+- Gebruik niet ceo:naam direct op het gezicht.
+- Combineer niet meteen een gemeente-filter met de geometrische relatie.
+- Gebruik geof:sfWithin voor objecten die binnen het gezicht liggen.
+- Gebruik geof:sfIntersects als fallback wanneer sfWithin geen resultaten geeft.
+
+VASTE EXTRA PREFIXEN VOOR GEOSPATIAL QUERIES:
+PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
+PREFIX gsp: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+
+Voorbeeldquery:
+
+PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
+PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
+PREFIX gsp: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+
+SELECT DISTINCT ?gezicht ?rm ?gezichtsnummer ?gezichtsnaam ?nummer ?naam ?gezichtWkt ?rmWkt
+WHERE {
+  GRAPH graph:instanties-rce {
+    ?gezicht a ceo:Gezicht ;
+      ceo:gezichtsnummer ?gezichtsnummer ;
+      ceo:heeftNaam/ceo:naam ?gezichtsnaam ;
+      ceo:heeftGeometrie/gsp:asWKT ?gezichtWkt .
+
+    ?rm a ceo:Rijksmonument ;
+      ceo:rijksmonumentnummer ?nummer ;
+      ceo:heeftGeometrie/gsp:asWKT ?rmWkt .
+
+    OPTIONAL {
+      ?rm ceo:heeftNaam/ceo:naam ?naam .
+    }
+
+    FILTER(CONTAINS(LCASE(STR(?gezichtsnaam)), "dordrecht"))
+    FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
+  }
+}
+LIMIT 50
+
+Fallback:
+Als geof:sfWithin geen resultaten geeft, gebruik:
+
+FILTER(geof:sfIntersects(?rmWkt, ?gezichtWkt))
