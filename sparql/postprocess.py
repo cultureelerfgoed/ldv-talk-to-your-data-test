@@ -175,7 +175,6 @@ def postprocess(query: str, mode: str) -> str:
     4. Normaliseer provincie naar URI
     5. Fix label filters
     6. Inject prefixen opnieuw, want fixes kunnen rdfs toevoegen
-    7. Verwijder LIMIT in lijstmodus
     """
     query = query.replace("```sparql", "").replace("```", "").strip()
 
@@ -184,8 +183,5 @@ def postprocess(query: str, mode: str) -> str:
     query = normalize_provincie_uri(query)
     query = fix_label_filter(query)
     query = inject_prefixes(query)
-
-    if mode == "lijst":
-        query = remove_limit(query)
 
     return query
