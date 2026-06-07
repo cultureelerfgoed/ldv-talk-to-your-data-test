@@ -448,3 +448,35 @@ gebruik altijd:
 Niet:
 
 ?rm ceo:cultuurhistorischObjectnummer "1" .
+
+Vondst type:
+Gebruik altijd:
+
+?vondst ceo:heeftType ?typeObj .
+?typeObj ceo:heeftTypeNaam ?typeConcept .
+?typeConcept skos:prefLabel ?type .
+
+Vondst materiaal:
+Gebruik altijd:
+
+?vondst ceo:heeftMateriaal ?materiaalObj .
+?materiaalObj ceo:heeftMateriaalNaam ?materiaalConcept .
+?materiaalConcept skos:prefLabel ?materiaal .
+
+Vondst toestand:
+Gebruik altijd:
+
+?vondst ceo:heeftToestand ?toestandConcept .
+?toestandConcept skos:prefLabel ?toestand .
+
+Vondst datering:
+Gebruik altijd:
+
+?vondst ceo:heeftGebeurtenis ?gebeurtenis .
+?gebeurtenis ceo:heeftDatering ?datering .
+
+Vondstlocatie geometrie:
+Geometrie zit meestal op gekoppeld onderzoeksgebied:
+
+?vondstlocatie ceo:ligtInObject ?onderzoeksgebied .
+?onderzoeksgebied ceo:heeftGeometrie/geo:asWKT ?wkt .
