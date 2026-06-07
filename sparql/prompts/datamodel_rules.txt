@@ -22,189 +22,18 @@ Gebruik nooit:
 - ceosp:
 - ceox:
 
-ALGEMENE REGELS
+ALGEMEEN
 
-- Genereer alleen SPARQL.
-- Gebruik geen uitleg buiten de SPARQL-query.
+- Gebruik GRAPH graph:instanties-rce voor CHO-instance-data.
+- Gebruik alleen bewezen classes en properties uit deze regels.
 - Verzin geen classes.
 - Verzin geen properties.
 - Gebruik geen meervoud als classnaam.
-- Gebruik alleen termen uit de CEO of uit deze bewezen patronen.
-- Gebruik GRAPH graph:instanties-rce voor CHO-instance-data.
-- Gebruik bij lijstvragen LIMIT, tenzij de gebruiker expliciet alle resultaten vraagt.
-- Gebruik COUNT alleen in tellingmodus.
-- Gebruik DISTINCT bij tellingen met joins.
-- Gebruik SELECT DISTINCT bij lijstvragen met joins.
-- Gebruik OPTIONAL alleen voor velden die niet nodig zijn om te filteren.
-- Zet verplichte filterpaden niet volledig in OPTIONAL.
-- Gebruik geen SELECT *.
 - Gebruik geen lang(), LANGMATCHES() of @nl-filter.
-
-QUERYSTRATEGIE
-
-1. Bepaal eerst het objecttype:
-- Rijksmonument
-- Complex
-- Gezicht
-- Werelderfgoed
-- Archeologisch object
-- Gebiedsobject
-
-2. Bepaal daarna het vraagtype:
-- lijstvraag
-- telvraag
-- kaartvraag
-- detailvraag
-- tekstzoekvraag
-- ruimtelijke vraag
-
-3. Kies daarna pas:
-- geometriepad
-- hiërarchische navigatie
-- OPTIONAL-velden
-- DISTINCT
-- GeoSPARQL
-
-4. Gebruik tekstzoeking alleen als:
-- de gebruiker expliciet vraagt naar tekst, beschrijving of omschrijving
-- geen gestructureerd veld bestaat
-
-5. Gebruik geometrische relaties alleen als:
-- beide objecten geometrie hebben
-
-ANTI-HALLUCINATIE
-
-Gebruik alleen:
-- classes uit GELDIGE HOOFDCLASSES
-- properties die expliciet in deze regels voorkomen
-- bewezen querypatronen
-
-Verzin nooit:
-- afgeleide propertynamen
-- verkorte namen
-- Engelstalige varianten
-- meervouden
-- ceo:heeftPlaats
-- ceo:heeftGemeente
-- ceo:heeftAdres
-- ceo:heeftArchitect
-- ceo:heeftMateriaalNaam direct op het hoofdobject
-- ceo:heeftTypeNaam direct op het hoofdobject
-
-CEO IS EEN GELAAGD ERFGOEDMODEL
-
-CEO bevat meerdere typen erfgoedobjecten:
-
-1. Puntobjecten:
-- gebouwen
-- objecten
-- vondsten
-
-2. Gebiedsobjecten:
-- stadsgezichten
-- dorpsgezichten
-- onderzoeksgebieden
-- terreinen
-
-3. Hiërarchische objecten:
-- complexen
-- vondstlocaties
-- terreinen
-
-4. Status- en aanwijzingslagen:
-- werelderfgoed
-- bescherming
-- waardering
-
-Gebruik verschillende querystrategieën per objecttype.
-
-Puntobjecten:
-- meestal directe geometrie
-
-Gebiedsobjecten:
-- polygon-geometrie
-- meerdere relaties
-- SELECT DISTINCT gebruiken
-
-Hiërarchische objecten:
-- ceo:bevatObject voor omlaag navigeren
-- ceo:ligtInObject voor omhoog navigeren
-
-Statuslagen:
-- verwijzen naar andere objecten
-- vaak geen zelfstandig fysiek object
-
-OBJECTPROPERTIES EN DATATYPEPROPERTIES
-
-In de CEO geldt als vuistregel:
-
-- properties die beginnen met ceo:heeft... zijn objectproperties
-- properties met patroon ceo:is...Van zijn objectproperties
-- objectproperties verwijzen naar een URI of resource
-- objectproperties hebben meestal een vervolgstap nodig
-- filter niet direct op ceo:heeft... alsof het een tekstwaarde is
-
-Fout:
-
-?cho ceo:heeftNaam ?naam .
-FILTER(CONTAINS(LCASE(STR(?naam)), "rijksmuseum"))
-
-Goed:
-
-?cho ceo:heeftNaam ?naamNode .
-?naamNode ceo:naam ?naam .
-FILTER(CONTAINS(LCASE(STR(?naam)), "rijksmuseum"))
-
-Fout:
-
-?cho ceo:heeftOmschrijving ?omschrijving .
-
-Goed:
-
-?cho ceo:heeftOmschrijving ?omschrijvingNode .
-?omschrijvingNode ceo:omschrijving ?omschrijving .
-
-Fout:
-
-?cho ceo:heeftMonumentAard ?aard .
-FILTER(CONTAINS(LCASE(STR(?aard)), "archeologisch"))
-
-Goed:
-
-?cho ceo:heeftMonumentAard ?aardConcept .
-?aardConcept skos:prefLabel ?aard .
-FILTER(LCASE(STR(?aard)) = "archeologisch")
-
-Fout:
-
-?cho ceo:heeftGeometrie ?wkt .
-
-Goed:
-
-?cho ceo:heeftGeometrie ?geometrie .
-?geometrie geo:asWKT ?wkt .
-
-Of verkort:
-
-?cho ceo:heeftGeometrie/geo:asWKT ?wkt .
-
-Datatypeproperties geven literals terug, zoals tekst, datum, nummer of boolean.
-
-Voorbeelden van datatypeproperties:
-- ceo:naam
-- ceo:omschrijving
-- ceo:rijksmonumentnummer
-- ceo:cultuurhistorischObjectnummer
-- ceo:registratiedatum
-- ceo:datumInschrijvingInMonumentenregister
-- ceo:gezichtsnummer
-- ceo:werelderfgoednummer
-- ceo:bijzonderGebied
-- ceo:aantalVondsten
-- ceo:aantalGrondsporen
-- ceo:internationaalKenteken
-
-Alleen op datatypeproperties filter je direct met STR(), CONTAINS(), REGEX(), datumvergelijking of numerieke vergelijking.
+- Gebruik SELECT DISTINCT bij lijstqueries met joins.
+- Gebruik COUNT(DISTINCT ?hoofdobject) bij tellingen met joins.
+- Gebruik OPTIONAL alleen voor extra velden.
+- Zet verplichte filterpaden niet in OPTIONAL.
 
 GELDIGE HOOFDCLASSES
 
@@ -244,87 +73,94 @@ Gebruik nooit:
 - ceosp:heeftProvincie
 - ceox:heeftProvincie
 - ceox:heeftAdresgegevens
+- ceo:heeftPlaats
+- ceo:heeftGemeente
+- ceo:heeftAdres
+- ceo:heeftArchitect
+- ceo:heeftFunctie
+- ceo:heeftMateriaalNaam direct op hoofdobject
+- ceo:heeftTypeNaam direct op hoofdobject
+
+OBJECTPROPERTIES EN DATATYPEPROPERTIES
+
+Vuistregel:
+- ceo:heeft... verwijst meestal naar een URI of node.
+- ceo:is...Van verwijst meestal naar een URI of node.
+- Filter niet direct op ceo:heeft... alsof het tekst is.
+- Volg altijd het pad naar een literal of naar skos:prefLabel.
+
+Naam:
+?cho ceo:heeftNaam ?naamNode .
+?naamNode ceo:naam ?naam .
+
+Omschrijving:
+?cho ceo:heeftOmschrijving ?omschrijvingNode .
+?omschrijvingNode ceo:omschrijving ?omschrijving .
+
+Geometrie:
+?cho ceo:heeftGeometrie ?geometrie .
+?geometrie geo:asWKT ?wkt .
+
+Datatypeproperties:
+- ceo:naam
+- ceo:omschrijving
+- ceo:rijksmonumentnummer
+- ceo:cultuurhistorischObjectnummer
+- ceo:registratiedatum
+- ceo:datumInschrijvingInMonumentenregister
+- ceo:gezichtsnummer
+- ceo:werelderfgoednummer
+- ceo:bijzonderGebied
+- ceo:aantalVondsten
+- ceo:aantalGrondsporen
+- ceo:internationaalKenteken
 
 SEMANTISCHE INTERPRETATIE
 
 "beschermd gezicht", "gezicht", "stadsgezicht", "dorpsgezicht":
-gebruik ceo:Gezicht
+gebruik ceo:Gezicht.
 
 "werelderfgoed", "UNESCO":
-gebruik ceo:Werelderfgoed
-
-"omschrijving", "beschrijving", "vrije tekst":
-gebruik ceo:heeftOmschrijving/ceo:omschrijving
-markeer zoekresultaten uit omschrijving als onzeker met:
-BIND("omschrijving (onzeker)" AS ?bron)
+gebruik ceo:Werelderfgoed.
 
 "blauw-wit schildje", "blauw witte schildjes", "internationaal kenteken", "Haags Verdrag schildje":
 gebruik:
 ?cho ceo:internationaalKenteken true .
 
-Zoek niet op de tekst "blauw-wit schildje".
-
 "architect", "ontwerper", "bouwmeester", "bouwkundige", "constructeur":
 gebruik ceo:Gebeurtenis en ceo:ActorEnRol.
 Gebruik niet ceo:architect.
 
-"stijl":
-gebruik ceo:StijlEnCultuur
-
-"materiaal":
-gebruik ceo:Materiaal
-
-"functie":
-gebruik ceo:Functie
-
-"type":
-gebruik ceo:Type
-
 "archeologische rijksmonumenten":
-gebruik ceo:Rijksmonument met ceo:heeftMonumentAard en skos:prefLabel "archeologisch"
+gebruik ceo:Rijksmonument met ceo:heeftMonumentAard en skos:prefLabel "archeologisch".
 
 "gebouwde rijksmonumenten":
-gebruik ceo:Rijksmonument met ceo:heeftMonumentAard en skos:prefLabel "onroerend gebouwd"
+gebruik ceo:Rijksmonument met ceo:heeftMonumentAard en skos:prefLabel "onroerend gebouwd".
 
 BASISREGISTRATIE EN LOCATIE
 
 Provincie staat niet direct op een cultuurhistorisch object.
-Provincie loopt via ceo:heeftBasisregistratieRelatie.
+Gebruik:
 
-Correct patroon:
-
-?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
-?basisrelatie ceo:heeftProvincie <PROVINCIE_URI> .
-
-Gebruik nooit:
-
-?cho ceo:heeftProvincie <PROVINCIE_URI> .
+?cho ceo:heeftBasisregistratieRelatie ?relatie .
+?relatie ceo:heeftProvincie <PROVINCIE_URI> .
 
 Gemeente loopt via BRKRelatie:
 
-?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
-?basisrelatie ceo:heeftBRKRelatie ?brk .
+?cho ceo:heeftBasisregistratieRelatie ?relatie .
+?relatie ceo:heeftBRKRelatie ?brk .
 ?brk ceo:gemeentenaam ?gemeente .
 
 Voor gewone gemeentevragen gebruik je BRK/gemeentenaam, niet BAG/woonplaatsnaam.
 
 Adres en woonplaats lopen via BAGRelatie:
 
-?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
-?basisrelatie ceo:heeftBAGRelatie ?bag .
+?cho ceo:heeftBasisregistratieRelatie ?relatie .
+?relatie ceo:heeftBAGRelatie ?bag .
 OPTIONAL { ?bag ceo:woonplaatsnaam ?woonplaats . }
 OPTIONAL { ?bag ceo:volledigAdres ?adres . }
 
-Zoeken op woonplaatsnaam alleen als de gebruiker expliciet naar woonplaats vraagt:
-
-?cho ceo:heeftBasisregistratieRelatie ?basisrelatie .
-?basisrelatie ceo:heeftBAGRelatie ?bag .
-?bag ceo:woonplaatsnaam ?woonplaats .
-FILTER(CONTAINS(LCASE(STR(?woonplaats)), "zeist"))
-
 PROVINCIE URI'S
-
-Gebruik deze URI's:
 
 - Drenthe: <http://standaarden.overheid.nl/owms/terms/Drenthe>
 - Flevoland: <http://standaarden.overheid.nl/owms/terms/Flevoland>
@@ -340,172 +176,84 @@ Gebruik deze URI's:
 - Zeeland: <http://standaarden.overheid.nl/owms/terms/Zeeland>
 - Zuid-Holland: <http://standaarden.overheid.nl/owms/terms/Zuid-Holland>
 
-NAAM
+RIJKSMONUMENTEN
 
-Naam staat op een ceo:Naam-node.
+Basis:
+?rm a ceo:Rijksmonument .
+?rm ceo:rijksmonumentnummer ?nummer .
 
-Correct patroon:
-
+Naam:
 OPTIONAL {
-  ?cho ceo:heeftNaam ?naamNode .
+  ?rm ceo:heeftNaam ?naamNode .
   ?naamNode ceo:naam ?naam .
 }
 
-OMSCHRIJVING
+Rijksmonumentnummer:
+?rm ceo:rijksmonumentnummer "12345" .
 
-Omschrijving staat op een ceo:Omschrijving-node.
+Gebruik ceo:cultuurhistorischObjectnummer niet voor rijksmonumenten, tenzij de gebruiker expliciet CHO-nummer of cultuurhistorisch objectnummer zegt.
 
-Correct patroon:
+Monumentaard:
+?rm ceo:heeftMonumentAard ?aardConcept .
+?aardConcept skos:prefLabel ?aard .
 
-OPTIONAL {
-  ?cho ceo:heeftOmschrijving ?omschrijvingNode .
-  ?omschrijvingNode ceo:omschrijving ?omschrijving .
-}
+Juridische status:
+?rm ceo:heeftJuridischeStatus ?statusConcept .
+?statusConcept skos:prefLabel ?status .
 
-Omschrijving is vrije tekst.
-Gebruik omschrijving voor tonen of als laatste redmiddel voor zoeken.
+FUNCTIE EN TYPE BIJ RIJKSMONUMENTEN
 
-Als een resultaat alleen via omschrijving matcht, voeg toe:
+Oorspronkelijke functie:
+?rm ceo:heeftOorspronkelijkeFunctie ?functieObj .
+?functieObj ceo:heeftFunctieNaam ?functieConcept .
+?functieConcept skos:prefLabel ?functieLabel .
 
-BIND("omschrijving (onzeker)" AS ?bron)
+Huidige functie:
+?rm ceo:heeftHuidigeFunctie ?functieObj .
+?functieObj ceo:heeftFunctieNaam ?functieConcept .
+?functieConcept skos:prefLabel ?functieLabel .
 
-GEOMETRIE
+Type:
+?rm ceo:heeftKennisregistratie ?typeObj .
+?typeObj a ceo:Type .
+?typeObj ceo:heeftTypeNaam ?typeConcept .
+?typeConcept skos:prefLabel ?typeLabel .
 
-Gebruik GeoSPARQL voor geometrie.
+Bij functie/type zoekvragen:
+- gebruik een gegroepeerd UNION-blok
+- zet dit blok niet in OPTIONAL
+- gebruik nooit ?rm ceo:heeftFunctie
+- selecteer ?bron als je BIND gebruikt
 
-Voor gewone kaartweergave:
-
-?cho ceo:heeftGeometrie ?geometrie .
-?geometrie geo:asWKT ?wkt .
-
-Gebruik bij kaartvragen altijd variabele ?wkt.
-
-Voor kaartvragen of vragen met woorden zoals:
-- kaart
-- kaartje
-- geometrie
-- locatie op kaart
-- toon op kaart
-- waar liggen
-- ligging
-
-voeg toe:
-
-OPTIONAL {
-  ?cho ceo:heeftGeometrie ?geometrie .
-  ?geometrie geo:asWKT ?wkt .
-}
-
-Of verplicht als de gebruiker expliciet een kaart wil:
-
-?cho ceo:heeftGeometrie ?geometrie .
-?geometrie geo:asWKT ?wkt .
-
-GEOSPATIAL RELATIES
-
-Gebruik GeoSPARQL wanneer de gebruiker vraagt naar ruimtelijke relaties, zoals:
-- rijksmonumenten binnen een gezicht
-- monumenten in een beschermd gezicht
-- objecten binnen werelderfgoed
-- objecten binnen een gebied
-- wat ligt binnen
-- wat valt binnen
-- welke objecten liggen in dit gebied
-
-Gebruik bij ruimtelijke relaties bij voorkeur gsp:asWKT:
-
-?object ceo:heeftGeometrie ?objectGeometrie .
-?objectGeometrie gsp:asWKT ?objectWkt .
-
-?gebied ceo:heeftGeometrie ?gebiedGeometrie .
-?gebiedGeometrie gsp:asWKT ?gebiedWkt .
-
-FILTER(geof:sfWithin(?objectWkt, ?gebiedWkt))
-
-Gebruik niet tegelijk geo: en gsp: voor hetzelfde geometriepatroon binnen één query.
-
-Bij ruimtelijke queries met een gebied en objecten:
-- selecteer altijd beide geometrieën
-- gebruik ?gezichtWkt of ?gebiedWkt voor het gebied
-- gebruik ?rmWkt voor het rijksmonument
-- zet beide WKT-velden in SELECT, anders kan de frontend niet beide lagen tonen
-
-Voorbeeld:
-
-SELECT DISTINCT ?gezicht ?rm ?gezichtsnummer ?gezichtsnaam ?nummer ?naam ?gezichtWkt ?rmWkt
-WHERE {
-  GRAPH graph:instanties-rce {
-    ?gezicht a ceo:Gezicht .
-    ?gezicht ceo:gezichtsnummer ?gezichtsnummer .
-    ?gezicht ceo:heeftNaam/ceo:naam ?gezichtsnaam .
-    ?gezicht ceo:heeftGeometrie ?gezichtGeometrie .
-    ?gezichtGeometrie gsp:asWKT ?gezichtWkt .
-
-    ?rm a ceo:Rijksmonument .
-    ?rm ceo:rijksmonumentnummer ?nummer .
-    ?rm ceo:heeftGeometrie ?rmGeometrie .
-    ?rmGeometrie gsp:asWKT ?rmWkt .
-
-    FILTER(CONTAINS(LCASE(STR(?gezichtsnaam)), "dordrecht"))
-    FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
-
-    OPTIONAL {
-      ?rm ceo:heeftNaam/ceo:naam ?naam .
-    }
+Patroon:
+{
+  {
+    ?rm ceo:heeftOorspronkelijkeFunctie ?functieObj .
+    ?functieObj ceo:heeftFunctieNaam ?functieConcept .
+    ?functieConcept skos:prefLabel ?functieLabel .
+    FILTER(CONTAINS(LCASE(STR(?functieLabel)), "kerk"))
+    BIND("oorspronkelijke functie" AS ?bron)
+  }
+  UNION
+  {
+    ?rm ceo:heeftHuidigeFunctie ?functieObj .
+    ?functieObj ceo:heeftFunctieNaam ?functieConcept .
+    ?functieConcept skos:prefLabel ?functieLabel .
+    FILTER(CONTAINS(LCASE(STR(?functieLabel)), "kerk"))
+    BIND("huidige functie" AS ?bron)
+  }
+  UNION
+  {
+    ?rm ceo:heeftKennisregistratie ?typeObj .
+    ?typeObj a ceo:Type .
+    ?typeObj ceo:heeftTypeNaam ?typeConcept .
+    ?typeConcept skos:prefLabel ?functieLabel .
+    FILTER(CONTAINS(LCASE(STR(?functieLabel)), "kerk"))
+    BIND("type" AS ?bron)
   }
 }
-LIMIT 50
-
-Als sfWithin geen resultaten geeft:
-- probeer geof:sfIntersects
-- of geef een tussenmelding dat de geometrische koppeling geen resultaat opleverde
-
-NUMMERS EN IDENTIFICATIE
-
-Gebruik het juiste nummer-property per objecttype.
-
-Rijksmonumenten:
-- ceo:rijksmonumentnummer
-
-Gezichten:
-- ceo:gezichtsnummer
-
-Werelderfgoed:
-- ceo:werelderfgoednummer
-
-Complexen:
-- ceo:complexnummer
-
-Archeologische complexen:
-- ceo:archis2Complexnummer
-
-Archeologische terreinen:
-- ceo:archis2Monumentnummer
-
-Vondstlocaties:
-- ceo:archis2Vondstmeldingsnummer
-- ceo:archis2Waarnemingsnummer
-
-Algemeen CHO-objectnummer:
-- ceo:cultuurhistorischObjectnummer
-
-Gebruik ceo:cultuurhistorischObjectnummer niet voor Rijksmonumenten tenzij de gebruiker expliciet vraagt naar CHO-nummer of cultuurhistorisch objectnummer.
-
-Bij vragen zoals:
-- "rijksmonument nummer 1"
-- "rijksmonument met nummer 1"
-- "monumentnummer 1"
-
-gebruik altijd:
-
-?rm a ceo:Rijksmonument .
-?rm ceo:rijksmonumentnummer "1" .
 
 ACTOREN EN ROLLEN
-
-Gebruik geen ceo:architect.
-
-Architectinformatie loopt via gebeurtenis en ActorEnRol:
 
 ?rm ceo:heeftGebeurtenis ?gebeurtenis .
 ?gebeurtenis ceo:heeftActorEnRol ?actorEnRol .
@@ -513,462 +261,39 @@ Architectinformatie loopt via gebeurtenis en ActorEnRol:
 ?actorEnRol ceo:heeftRol ?rol .
 
 Voor architectvragen:
-
 FILTER(CONTAINS(LCASE(STR(?rol)), "architect"))
 
-Voor vragen naar een specifieke persoon of organisatie:
+GEOMETRIE
 
-FILTER(CONTAINS(LCASE(STR(?actor)), "kramer"))
+Gewone kaartweergave:
+?cho ceo:heeftGeometrie ?geometrie .
+?geometrie geo:asWKT ?wkt .
 
-FUNCTIE EN TYPE BIJ RIJKSMONUMENTEN
+Ruimtelijke relatie:
+?object ceo:heeftGeometrie ?objectGeometrie .
+?objectGeometrie gsp:asWKT ?objectWkt .
+?gebied ceo:heeftGeometrie ?gebiedGeometrie .
+?gebiedGeometrie gsp:asWKT ?gebiedWkt .
+FILTER(geof:sfWithin(?objectWkt, ?gebiedWkt))
 
-Oorspronkelijke functie:
+Bij geof:sfWithin of geof:sfIntersects:
+- beide geometrieën verplicht
+- geometrieën niet in OPTIONAL
+- beide WKT-velden selecteren
 
-?rm ceo:heeftOorspronkelijkeFunctie ?functieObj .
-?functieObj ceo:heeftFunctieNaam ?functieConcept .
-?functieConcept skos:prefLabel ?functieLabel .
-
-Huidige functie:
-
-?rm ceo:heeftHuidigeFunctie ?functieObj .
-?functieObj ceo:heeftFunctieNaam ?functieConcept .
-?functieConcept skos:prefLabel ?functieLabel .
-
-Type:
-
-?rm ceo:heeftKennisregistratie ?typeObj .
-?typeObj a ceo:Type .
-?typeObj ceo:heeftTypeNaam ?typeConcept .
-?typeConcept skos:prefLabel ?typeLabel .
-
-ARCHEOLOGIE ALGEMEEN
-
-Gebruik bij archeologische queries altijd GRAPH graph:instanties-rce.
-
-Archeologische objecten zijn niet plat gemodelleerd.
-Veel informatie loopt via kennisregistraties en SKOS-concepten.
-
-Gebruik ceo:bevatObject voor omlaag navigeren.
-Gebruik ceo:ligtInObject voor omhoog navigeren.
-
-Veelvoorkomende paden:
-
-Onderzoeksgebied naar vondstlocatie:
-
-?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
-?onderzoeksgebied ceo:bevatObject ?vondstlocatie .
-?vondstlocatie a ceo:Vondstlocatie .
-
-Vondstlocatie naar onderzoeksgebied:
-
-?vondstlocatie a ceo:Vondstlocatie .
-?vondstlocatie ceo:ligtInObject ?onderzoeksgebied .
-?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
-
-Vondstlocatie naar vondsten:
-
-?vondstlocatie a ceo:Vondstlocatie .
-?vondstlocatie ceo:bevatObject ?vondst .
-?vondst a ceo:Vondsten .
-
-Vondsten naar vondstlocatie:
-
-?vondst a ceo:Vondsten .
-?vondst ceo:ligtInObject ?vondstlocatie .
-?vondstlocatie a ceo:Vondstlocatie .
-
-Vondstlocatie naar grondsporen:
-
-?vondstlocatie a ceo:Vondstlocatie .
-?vondstlocatie ceo:bevatObject ?grondspoor .
-?grondspoor a ceo:Grondsporen .
-
-Grondspoor naar vondstlocatie:
-
-?grondspoor a ceo:Grondsporen .
-?grondspoor ceo:ligtInObject ?vondstlocatie .
-?vondstlocatie a ceo:Vondstlocatie .
-
-Archeologisch terrein naar complex:
-
-?terrein a ceo:ArcheologischTerrein .
-?terrein ceo:bevatObject ?complex .
-?complex a ceo:ArcheologischComplex .
-
-Archeologisch complex naar terrein:
-
-?complex a ceo:ArcheologischComplex .
-?complex ceo:ligtInObject ?terrein .
-?terrein a ceo:ArcheologischTerrein .
-
-Archeologisch terrein naar rijksmonument:
-
-?terrein a ceo:ArcheologischTerrein .
-?terrein ceo:ligtInObject ?rm .
+Rijksmonumenten binnen een gezicht:
+?gezicht a ceo:Gezicht .
+?gezicht ceo:heeftGeometrie ?gezichtGeometrie .
+?gezichtGeometrie gsp:asWKT ?gezichtWkt .
 ?rm a ceo:Rijksmonument .
+?rm ceo:heeftGeometrie ?rmGeometrie .
+?rmGeometrie gsp:asWKT ?rmWkt .
+FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
 
-Rijksmonument naar archeologisch terrein:
+Gebruik nooit:
+?rm ceo:ligtInObject ?gezicht .
 
-?rm a ceo:Rijksmonument .
-?rm ceo:bevatObject ?terrein .
-?terrein a ceo:ArcheologischTerrein .
-
-GEOMETRIE BIJ ARCHEOLOGIE
-
-Geometrie zit niet altijd op het gevraagde object zelf.
-Vaak zit geometrie hoger in de hiërarchie.
-
-Directe geometrie:
-
-?object ceo:heeftGeometrie ?geoObj .
-?geoObj geo:asWKT ?wkt .
-
-Geometrie voor vondstlocaties:
-
-?vondstlocatie ceo:ligtInObject ?onderzoeksgebied .
-?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
-?onderzoeksgebied ceo:heeftGeometrie ?geoObj .
-?geoObj geo:asWKT ?wkt .
-
-Geometrie voor vondsten:
-
-?vondst ceo:ligtInObject ?vondstlocatie .
-?vondstlocatie ceo:ligtInObject ?onderzoeksgebied .
-?onderzoeksgebied ceo:heeftGeometrie ?geoObj .
-?geoObj geo:asWKT ?wkt .
-
-Geometrie voor grondsporen:
-
-?grondspoor ceo:ligtInObject ?vondstlocatie .
-?vondstlocatie ceo:ligtInObject ?onderzoeksgebied .
-?onderzoeksgebied ceo:heeftGeometrie ?geoObj .
-?geoObj geo:asWKT ?wkt .
-
-Gebruik asWKT-RD alleen als de gebruiker expliciet vraagt naar RD-coördinaten.
-
-LOCATIE BIJ ARCHEOLOGIE
-
-Vondstlocatie woonplaats:
-
-?vondstlocatie ceo:heeftBasisregistratieRelatie ?relatie .
-?relatie ceo:heeftBAGRelatie ?bag .
-?bag ceo:woonplaatsnaam ?woonplaats .
-
-Onderzoeksgebied woonplaats:
-
-?onderzoeksgebied ceo:heeftBasisregistratieRelatie ?relatie .
-?relatie ceo:heeftBAGRelatie ?bag .
-?bag ceo:woonplaatsnaam ?woonplaats .
-
-Archeologisch terrein woonplaats:
-
-?terrein ceo:heeftBasisregistratieRelatie ?relatie .
-?relatie ceo:heeftBAGRelatie ?bag .
-?bag ceo:woonplaatsnaam ?woonplaats .
-
-Locatienaam:
-
-?object ceo:heeftLocatieAanduiding ?locatieAanduiding .
-?locatieAanduiding ceo:locatienaam ?locatienaam .
-
-VONDSTEN
-
-Klasse:
-
-?vondst a ceo:Vondsten .
-
-Basisvelden:
-
-OPTIONAL { ?vondst ceo:aantalVondsten ?aantalVondsten . }
-OPTIONAL { ?vondst ceo:archis2Vondstnummer ?archis2Vondstnummer . }
-OPTIONAL { ?vondst ceo:cultuurhistorischObjectnummer ?objectnummer . }
-
-Vondstlocatie:
-
-?vondst ceo:ligtInObject ?vondstlocatie .
-?vondstlocatie a ceo:Vondstlocatie .
-
-Type:
-
-?vondst ceo:heeftType ?typeRegistratie .
-?typeRegistratie ceo:heeftTypeNaam ?typeConcept .
-?typeConcept skos:prefLabel ?typeLabel .
-
-Materiaal:
-
-?vondst ceo:heeftMateriaal ?materiaalRegistratie .
-?materiaalRegistratie ceo:heeftMateriaalNaam ?materiaalConcept .
-?materiaalConcept skos:prefLabel ?materiaalLabel .
-
-Toestand:
-
-OPTIONAL {
-  ?vondst ceo:heeftToestand ?toestandConcept .
-  ?toestandConcept skos:prefLabel ?toestandLabel .
-}
-
-Datering:
-
-OPTIONAL {
-  ?vondst ceo:heeftGebeurtenis ?gebeurtenis .
-  ?gebeurtenis ceo:heeftDatering ?datering .
-  OPTIONAL {
-    ?datering ceo:heeftBeginDatering ?begin .
-    ?begin ceo:heeftPeriode ?beginPeriode .
-    ?beginPeriode skos:prefLabel ?beginLabel .
-  }
-  OPTIONAL {
-    ?datering ceo:heeftEindDatering ?eind .
-    ?eind ceo:heeftPeriode ?eindPeriode .
-    ?eindPeriode skos:prefLabel ?eindLabel .
-  }
-}
-
-VONDSTLOCATIES
-
-Klasse:
-
-?vondstlocatie a ceo:Vondstlocatie .
-
-Basisvelden:
-
-OPTIONAL { ?vondstlocatie ceo:cultuurhistorischObjectnummer ?objectnummer . }
-
-Locatienaam:
-
-OPTIONAL {
-  ?vondstlocatie ceo:heeftLocatieAanduiding ?locatieAanduiding .
-  ?locatieAanduiding ceo:locatienaam ?locatienaam .
-}
-
-Woonplaats:
-
-OPTIONAL {
-  ?vondstlocatie ceo:heeftBasisregistratieRelatie ?relatie .
-  ?relatie ceo:heeftBAGRelatie ?bag .
-  ?bag ceo:woonplaatsnaam ?woonplaats .
-}
-
-Onderzoeksgebied:
-
-OPTIONAL {
-  ?vondstlocatie ceo:ligtInObject ?onderzoeksgebied .
-  ?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
-}
-
-GRONDSPOREN
-
-Klasse:
-
-?grondspoor a ceo:Grondsporen .
-
-Basisvelden:
-
-OPTIONAL { ?grondspoor ceo:aantalGrondsporen ?aantalGrondsporen . }
-OPTIONAL { ?grondspoor ceo:cultuurhistorischObjectnummer ?objectnummer . }
-
-Vondstlocatie:
-
-?grondspoor ceo:ligtInObject ?vondstlocatie .
-?vondstlocatie a ceo:Vondstlocatie .
-
-Type:
-
-?grondspoor ceo:heeftType ?typeRegistratie .
-?typeRegistratie ceo:heeftTypeNaam ?typeConcept .
-?typeConcept skos:prefLabel ?typeLabel .
-
-ARCHEOLOGISCHE COMPLEXEN
-
-Klasse:
-
-?complex a ceo:ArcheologischComplex .
-
-Basisvelden:
-
-OPTIONAL { ?complex ceo:archis2Complexnummer ?archis2Complexnummer . }
-OPTIONAL { ?complex ceo:cultuurhistorischObjectnummer ?objectnummer . }
-
-Type:
-
-?complex ceo:heeftType ?typeRegistratie .
-?typeRegistratie ceo:heeftTypeNaam ?typeConcept .
-?typeConcept skos:prefLabel ?typeLabel .
-
-Omschrijving:
-
-OPTIONAL {
-  ?complex ceo:heeftOmschrijving ?omschrijvingObj .
-  ?omschrijvingObj ceo:omschrijving ?omschrijving .
-}
-
-Datering:
-
-OPTIONAL {
-  ?complex ceo:heeftGebeurtenis ?gebeurtenis .
-  ?gebeurtenis ceo:heeftDatering ?datering .
-  OPTIONAL {
-    ?datering ceo:heeftBeginDatering ?begin .
-    ?begin ceo:heeftPeriode ?beginPeriode .
-    ?beginPeriode skos:prefLabel ?beginLabel .
-  }
-  OPTIONAL {
-    ?datering ceo:heeftEindDatering ?eind .
-    ?eind ceo:heeftPeriode ?eindPeriode .
-    ?eindPeriode skos:prefLabel ?eindLabel .
-  }
-}
-
-ARCHEOLOGISCHE ONDERZOEKSGEBIEDEN
-
-Klasse:
-
-?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
-
-Basisvelden:
-
-OPTIONAL { ?onderzoeksgebied ceo:cultuurhistorischObjectnummer ?objectnummer . }
-OPTIONAL { ?onderzoeksgebied ceo:registratiedatum ?registratiedatum . }
-
-Geometrie:
-
-OPTIONAL {
-  ?onderzoeksgebied ceo:heeftGeometrie ?geoObj .
-  ?geoObj geo:asWKT ?wkt .
-}
-
-Omschrijving:
-
-OPTIONAL {
-  ?onderzoeksgebied ceo:heeftOmschrijving ?omschrijvingObj .
-  ?omschrijvingObj ceo:omschrijving ?omschrijving .
-}
-
-ARCHEOLOGISCHE TERREINEN
-
-Klasse:
-
-?terrein a ceo:ArcheologischTerrein .
-
-Basisvelden:
-
-OPTIONAL { ?terrein ceo:archis2Monumentnummer ?archis2Monumentnummer . }
-OPTIONAL { ?terrein ceo:cultuurhistorischObjectnummer ?objectnummer . }
-OPTIONAL { ?terrein ceo:registratiedatum ?registratiedatum . }
-
-Archeologische waardering:
-
-OPTIONAL {
-  ?terrein ceo:heeftArcheologischeWaardering ?waarderingConcept .
-  ?waarderingConcept skos:prefLabel ?waardering .
-}
-
-Complexen binnen terrein:
-
-OPTIONAL {
-  ?terrein ceo:bevatObject ?complex .
-  ?complex a ceo:ArcheologischComplex .
-}
-
-ZOEKEN OP ARCHEOLOGISCH TYPE
-
-Gebruik typevelden voor:
-- terp
-- wierde
-- greppel
-- sloot
-- kuil
-- paal
-- bunker
-- munt
-- bot
-- kogel
-- aardewerk
-- vingerhoed
-- boekbeslag
-
-Patroon:
-
-?object ceo:heeftType ?typeRegistratie .
-?typeRegistratie ceo:heeftTypeNaam ?typeConcept .
-?typeConcept skos:prefLabel ?typeLabel .
-FILTER(CONTAINS(LCASE(STR(?typeLabel)), "zoekterm"))
-
-ZOEKEN OP MATERIAAL
-
-Gebruik materiaalvelden voor:
-- metaal
-- lood
-- dierlijk bot
-- aardewerk
-- steen
-- houtskool
-
-Patroon:
-
-?vondst ceo:heeftMateriaal ?materiaalRegistratie .
-?materiaalRegistratie ceo:heeftMateriaalNaam ?materiaalConcept .
-?materiaalConcept skos:prefLabel ?materiaalLabel .
-FILTER(CONTAINS(LCASE(STR(?materiaalLabel)), "zoekterm"))
-
-ZOEKEN OP PERIODE
-
-Gebruik datering via gebeurtenis.
-
-Patroon:
-
-?object ceo:heeftGebeurtenis ?gebeurtenis .
-?gebeurtenis ceo:heeftDatering ?datering .
-
-{
-  ?datering ceo:heeftBeginDatering ?begin .
-  ?begin ceo:heeftPeriode ?periode .
-  ?periode skos:prefLabel ?periodeLabel .
-}
-UNION
-{
-  ?datering ceo:heeftEindDatering ?eind .
-  ?eind ceo:heeftPeriode ?periode .
-  ?periode skos:prefLabel ?periodeLabel .
-}
-
-FILTER(CONTAINS(LCASE(STR(?periodeLabel)), "romeinse"))
-
-MONUMENTENCOMPLEXEN
-
-Gebruik ceo:Complex voor monumentcomplexen.
-
-Complexen zijn hiërarchische container-objecten.
-
-Gebruik:
-- ceo:bevatObject voor onderdelen binnen complex
-- ceo:ligtInObject voor bovenliggend complex
-
-Complex naar onderdelen:
-
-?complex ceo:bevatObject ?onderdeel .
-
-Onderdeel naar complex:
-
-?onderdeel ceo:ligtInObject ?complex .
-
-Gebruik SELECT DISTINCT bij complexqueries.
-Onderdelen veroorzaken snel duplicaten.
-
-Geometrie kan:
-- direct op complex zitten
-- alleen op onderdeel zitten
-- alleen op bovenliggend monument zitten
-
-Gebruik daarom OPTIONAL geometrieblokken.
-
-STADS- EN DORPSGEZICHTEN
-
-Beschermde stads- en dorpsgezichten zijn gebiedsobjecten.
-
-Gebruik ceo:Gezicht.
-
-Basispatroon:
+GEZICHTEN
 
 ?gezicht a ceo:Gezicht .
 OPTIONAL { ?gezicht ceo:gezichtsnummer ?gezichtsnummer . }
@@ -981,28 +306,7 @@ OPTIONAL {
   ?geometrie geo:asWKT ?wkt .
 }
 
-Gebiedsobjecten kunnen:
-- meerdere woonplaatsen hebben
-- meerdere BAG-relaties hebben
-- meerdere monumenten bevatten
-
-Niet alle objecten binnen een gezicht zijn rijksmonumenten.
-
-Gebruik omschrijving vaker bij gezichten.
-Belangrijke informatie zit vaak in tekstuele beschrijvingen.
-
-Bij kaartvragen:
-Gebruik polygon-WKT rechtstreeks.
-Niet reduceren naar centroid.
-
 WERELDERFGOED
-
-Gebruik ceo:Werelderfgoed.
-
-Werelderfgoed is een status- of aanwijzingslaag.
-Behandel werelderfgoed niet automatisch als fysiek object.
-
-Basispatroon:
 
 ?werelderfgoed a ceo:Werelderfgoed .
 OPTIONAL { ?werelderfgoed ceo:werelderfgoednummer ?werelderfgoednummer . }
@@ -1015,30 +319,129 @@ OPTIONAL {
   ?geometrie geo:asWKT ?wkt .
 }
 
-Gebruik SELECT DISTINCT bij werelderfgoedqueries.
+MONUMENTENCOMPLEXEN
 
-Omschrijving en motivatie zijn belangrijk bij werelderfgoed.
+?complex a ceo:Complex .
+OPTIONAL {
+  ?complex ceo:bevatObject ?onderdeel .
+}
+OPTIONAL {
+  ?onderdeel ceo:ligtInObject ?complex .
+}
 
-Gebruik:
-?werelderfgoed ceo:heeftOmschrijving ?omschrijvingObj .
-?omschrijvingObj ceo:omschrijving ?omschrijving .
+ARCHEOLOGIE ALGEMEEN
 
-SELECT-RICHTLIJNEN ARCHEOLOGIE
+Gebruik archeologische classes alleen als de gebruiker expliciet vraagt naar archeologie, vondsten, vondstlocaties, grondsporen, archeologische complexen, onderzoeksgebieden of archeologische terreinen.
 
-Selecteer bij vondsten bij voorkeur:
-?vondst ?objectnummer ?archis2Vondstnummer ?aantalVondsten ?typeLabel ?materiaalLabel ?toestandLabel ?beginLabel ?eindLabel ?vondstlocatie ?locatienaam ?woonplaats ?wkt
+Gebruik ceo:bevatObject voor omlaag navigeren.
+Gebruik ceo:ligtInObject voor omhoog navigeren.
 
-Selecteer bij vondstlocaties bij voorkeur:
-?vondstlocatie ?objectnummer ?locatienaam ?woonplaats ?omschrijving ?wkt
+Archeologische hiërarchie:
+?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
+?onderzoeksgebied ceo:bevatObject ?locatie .
+?locatie a ceo:Vondstlocatie .
 
-Selecteer bij grondsporen bij voorkeur:
-?grondspoor ?objectnummer ?aantalGrondsporen ?typeLabel ?beginLabel ?eindLabel ?vondstlocatie ?locatienaam ?woonplaats ?wkt
+?locatie ceo:bevatObject ?vondst .
+?vondst a ceo:Vondsten .
 
-Selecteer bij archeologische complexen bij voorkeur:
-?complex ?objectnummer ?archis2Complexnummer ?typeLabel ?beginLabel ?eindLabel ?omschrijving ?wkt
+?locatie ceo:bevatObject ?grondspoor .
+?grondspoor a ceo:Grondsporen .
 
-Selecteer bij archeologische onderzoeksgebieden bij voorkeur:
-?onderzoeksgebied ?objectnummer ?locatienaam ?woonplaats ?omschrijving ?registratiedatum ?wkt
+?terrein a ceo:ArcheologischTerrein .
+?terrein ceo:bevatObject ?complex .
+?complex a ceo:ArcheologischComplex .
 
-Selecteer bij archeologische terreinen bij voorkeur:
-?terrein ?objectnummer ?archis2Monumentnummer ?locatienaam ?woonplaats ?waardering ?omschrijving ?wkt
+VONDSTEN
+
+?vondst a ceo:Vondsten .
+OPTIONAL { ?vondst ceo:aantalVondsten ?aantalVondsten . }
+OPTIONAL { ?vondst ceo:archis2Vondstnummer ?archis2Vondstnummer . }
+OPTIONAL { ?vondst ceo:cultuurhistorischObjectnummer ?objectnummer . }
+
+Vondstlocatie:
+?vondst ceo:ligtInObject ?locatie .
+?locatie a ceo:Vondstlocatie .
+
+Type:
+?vondst ceo:heeftType ?typeObj .
+?typeObj ceo:heeftTypeNaam ?typeConcept .
+?typeConcept skos:prefLabel ?typeLabel .
+
+Materiaal:
+?vondst ceo:heeftMateriaal ?materiaalObj .
+?materiaalObj ceo:heeftMateriaalNaam ?materiaalConcept .
+?materiaalConcept skos:prefLabel ?materiaalLabel .
+
+Datering:
+?vondst ceo:heeftGebeurtenis ?gebeurtenis .
+?gebeurtenis ceo:heeftDatering ?datering .
+
+Periode:
+{
+  ?datering ceo:heeftBeginDatering ?begin .
+  ?begin ceo:heeftPeriode ?periode .
+  ?periode skos:prefLabel ?periodeLabel .
+}
+UNION
+{
+  ?datering ceo:heeftEindDatering ?eind .
+  ?eind ceo:heeftPeriode ?periode .
+  ?periode skos:prefLabel ?periodeLabel .
+}
+
+VONDSTLOCATIES
+
+?locatie a ceo:Vondstlocatie .
+OPTIONAL { ?locatie ceo:cultuurhistorischObjectnummer ?objectnummer . }
+OPTIONAL {
+  ?locatie ceo:heeftLocatieAanduiding ?locatieAanduiding .
+  ?locatieAanduiding ceo:locatienaam ?locatienaam .
+}
+OPTIONAL {
+  ?locatie ceo:heeftBasisregistratieRelatie ?relatie .
+  ?relatie ceo:heeftBAGRelatie ?bag .
+  ?bag ceo:woonplaatsnaam ?woonplaats .
+}
+
+GRONDSPOREN
+
+?grondspoor a ceo:Grondsporen .
+OPTIONAL { ?grondspoor ceo:aantalGrondsporen ?aantalGrondsporen . }
+OPTIONAL { ?grondspoor ceo:cultuurhistorischObjectnummer ?objectnummer . }
+
+?grondspoor ceo:ligtInObject ?locatie .
+?locatie a ceo:Vondstlocatie .
+
+?grondspoor ceo:heeftType ?typeObj .
+?typeObj ceo:heeftTypeNaam ?typeConcept .
+?typeConcept skos:prefLabel ?typeLabel .
+
+ARCHEOLOGISCHE COMPLEXEN
+
+?complex a ceo:ArcheologischComplex .
+OPTIONAL { ?complex ceo:archis2Complexnummer ?archis2Complexnummer . }
+OPTIONAL { ?complex ceo:cultuurhistorischObjectnummer ?objectnummer . }
+
+?complex ceo:heeftType ?typeObj .
+?typeObj ceo:heeftTypeNaam ?typeConcept .
+?typeConcept skos:prefLabel ?typeLabel .
+
+ARCHEOLOGISCHE ONDERZOEKSGEBIEDEN
+
+?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
+OPTIONAL { ?onderzoeksgebied ceo:cultuurhistorischObjectnummer ?objectnummer . }
+OPTIONAL { ?onderzoeksgebied ceo:registratiedatum ?registratiedatum . }
+OPTIONAL {
+  ?onderzoeksgebied ceo:heeftGeometrie ?geoObj .
+  ?geoObj geo:asWKT ?wkt .
+}
+
+ARCHEOLOGISCHE TERREINEN
+
+?terrein a ceo:ArcheologischTerrein .
+OPTIONAL { ?terrein ceo:archis2Monumentnummer ?archis2Monumentnummer . }
+OPTIONAL { ?terrein ceo:cultuurhistorischObjectnummer ?objectnummer . }
+OPTIONAL {
+  ?terrein ceo:heeftArcheologischeWaardering ?waarderingConcept .
+  ?waarderingConcept skos:prefLabel ?waardering .
+}
