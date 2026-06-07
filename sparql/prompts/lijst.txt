@@ -435,3 +435,204 @@ OUTPUT:
 - Gebruik geen technische tussenvariabelen in SELECT.
 
 Gebruik de aanvullende kennis uit datamodel_rules.txt voor extra classes, property paths en bewezen patronen.
+
+ARCHEOLOGIE ALGEMEEN
+
+Gebruik archeologische classes alleen als de gebruiker expliciet vraagt naar archeologie, vondsten, vondstlocaties, grondsporen, archeologische complexen, onderzoeksgebieden of archeologische terreinen.
+
+Belangrijke archeologische classes:
+- ceo:Vondsten
+- ceo:Vondstlocatie
+- ceo:Grondsporen
+- ceo:ArcheologischComplex
+- ceo:ArcheologischOnderzoeksgebied
+- ceo:ArcheologischTerrein
+
+Belangrijke algemene archeologische relaties:
+- ceo:bevatObject
+- ceo:ligtInObject
+- ceo:heeftType
+- ceo:heeftMateriaal
+- ceo:heeftToestand
+- ceo:heeftGebeurtenis
+- ceo:heeftDatering
+- ceo:heeftOmschrijving
+- ceo:heeftKennisregistratie
+- ceo:heeftBasisregistratieRelatie
+- ceo:heeftLocatieAanduiding
+- ceo:heeftGeometrie
+
+Archeologische hiërarchie:
+- ceo:ArcheologischOnderzoeksgebied bevat ceo:Vondstlocatie
+- ceo:Vondstlocatie bevat ceo:Vondsten
+- ceo:Vondstlocatie bevat ceo:Grondsporen
+- ceo:Vondstlocatie bevat ceo:ArcheologischComplex
+- ceo:ArcheologischTerrein bevat ceo:ArcheologischComplex
+- ceo:Rijksmonument kan ceo:ArcheologischTerrein bevatten
+
+Gebruik ceo:ligtInObject voor omhoog navigeren.
+Gebruik ceo:bevatObject voor omlaag navigeren.
+
+ARCHEOLOGISCHE VONDSTEN
+
+Klasse:
+- ceo:Vondsten
+
+Gebruik deze klasse bij vragen naar:
+- vondsten
+- archeologische vondsten
+- artefacten
+- materiaalvondsten
+- munten
+- bot
+- aardewerk
+- metaal
+- kogels
+- objecten uit een vondstlocatie
+
+Belangrijke eigenschappen:
+- ceo:aantalVondsten
+- ceo:archis2Vondstnummer
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftType
+- ceo:heeftMateriaal
+- ceo:heeftToestand
+- ceo:heeftGebeurtenis
+- ceo:heeftStijlEnCultuur
+- ceo:ligtInObject
+
+Labels:
+- type via skos:prefLabel
+- materiaal via skos:prefLabel
+- toestand via skos:prefLabel
+- periode via skos:prefLabel
+- gebeurtenisnaam via skos:prefLabel
+
+ARCHEOLOGISCHE VONDSTLOCATIES
+
+Klasse:
+- ceo:Vondstlocatie
+
+Gebruik deze klasse bij vragen naar:
+- vondstlocaties
+- vindplaatsen
+- locaties met vondsten
+- locaties met grondsporen
+- archeologische locaties
+
+Belangrijke eigenschappen:
+- ceo:cultuurhistorischObjectnummer
+- ceo:bevatObject
+- ceo:ligtInObject
+- ceo:heeftBasisregistratieRelatie
+- ceo:heeftLocatieAanduiding
+- ceo:heeftOmschrijving
+- ceo:heeftVerwerving
+- ceo:registratiedatum
+
+Locatievelden:
+- ceo:locatienaam
+- ceo:woonplaatsnaam
+- ceo:volledigAdres
+- ceo:openbareRuimte
+- ceo:huisnummer
+
+ARCHEOLOGISCHE GRONDSPOREN
+
+Klasse:
+- ceo:Grondsporen
+
+Gebruik deze klasse bij vragen naar:
+- grondsporen
+- sporen
+- greppels
+- sloten
+- kuilen
+- palen
+- ploegsporen
+- archeologische sporen
+
+Belangrijke eigenschappen:
+- ceo:aantalGrondsporen
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftType
+- ceo:heeftGebeurtenis
+- ceo:heeftOmschrijving
+- ceo:ligtInObject
+
+ARCHEOLOGISCHE COMPLEXEN
+
+Klasse:
+- ceo:ArcheologischComplex
+
+Gebruik deze klasse bij vragen naar:
+- archeologische complexen
+- complextypen
+- terp
+- wierde
+- nederzetting
+- kanaal
+- greppelcomplex
+- bunkercomplex
+- archeologische structuren
+
+Belangrijke eigenschappen:
+- ceo:archis2Complexnummer
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftType
+- ceo:heeftGebeurtenis
+- ceo:heeftOmschrijving
+- ceo:ligtInObject
+
+ARCHEOLOGISCHE ONDERZOEKSGEBIEDEN
+
+Klasse:
+- ceo:ArcheologischOnderzoeksgebied
+
+Gebruik deze klasse bij vragen naar:
+- archeologische onderzoeksgebieden
+- onderzoeksgebieden
+- archeologisch onderzoek
+- gebieden waar archeologisch onderzoek is gedaan
+
+Belangrijke eigenschappen:
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftGeometrie
+- ceo:heeftOmschrijving
+- ceo:heeftKennisregistratie
+- ceo:heeftBasisregistratieRelatie
+- ceo:heeftLocatieAanduiding
+- ceo:registratiedatum
+- ceo:bevatObject
+
+Geometrie:
+- geo:asWKT
+- asWKT-RD
+
+Gebruik voor kaartvragen bij voorkeur geo:asWKT.
+Gebruik asWKT-RD alleen als de gebruiker expliciet om RD-coördinaten vraagt.
+
+ARCHEOLOGISCHE TERREINEN
+
+Klasse:
+- ceo:ArcheologischTerrein
+
+Gebruik deze klasse bij vragen naar:
+- archeologische terreinen
+- AMK-terreinen
+- terreinen met archeologische waarde
+- beschermde archeologische terreinen
+
+Belangrijke eigenschappen:
+- ceo:archis2Monumentnummer
+- ceo:cultuurhistorischObjectnummer
+- ceo:bevatObject
+- ceo:ligtInObject
+- ceo:heeftArcheologischeWaardering
+- ceo:heeftBasisregistratieRelatie
+- ceo:heeftLocatieAanduiding
+- ceo:heeftOmschrijving
+- ceo:registratiedatum
+
+Archeologische waardering:
+- skos:prefLabel
