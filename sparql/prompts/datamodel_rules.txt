@@ -36,6 +36,115 @@ ALGEMENE REGELS
 - Gebruik OPTIONAL voor naam, omschrijving, adres, type, functie en geometrie.
 - Gebruik geen SELECT *.
 
+QUERYSTRATEGIE
+
+1. Bepaal eerst het objecttype:
+- Rijksmonument
+- Complex
+- Gezicht
+- Werelderfgoed
+- Archeologisch object
+- Gebiedsobject
+
+2. Bepaal daarna het vraagtype:
+- lijstvraag
+- telvraag
+- kaartvraag
+- detailvraag
+- tekstzoekvraag
+- ruimtelijke vraag
+
+3. Kies daarna pas:
+- geometriepad
+- hiërarchische navigatie
+- OPTIONAL-velden
+- DISTINCT
+- GeoSPARQL
+
+4. Gebruik tekstzoeking alleen als:
+- expliciet gevraagd
+- geen gestructureerd veld bestaat
+
+5. Gebruik geometrische relaties alleen als:
+- beide objecten geometrie hebben
+
+ANTI-HALLUCINATIE
+
+Gebruik alleen:
+- classes uit GELDIGE HOOFDCLASSES
+- properties die expliciet in deze regels voorkomen
+- bewezen querypatronen
+
+Verzin nooit:
+- afgeleide propertynamen
+- verkorte namen
+- Engelstalige varianten
+- meervouden
+
+Gebruik nooit aannames zoals:
+- ceo:heeftPlaats
+- ceo:heeftGemeente
+- ceo:heeftAdres
+- ceo:heeftArchitect
+- ceo:heeftMateriaalNaam direct op object
+
+CEO TUSSENNODES
+
+Veel informatie loopt via registratienodes of tussenobjecten.
+
+Patroon:
+
+Object
+→ registratie-node
+→ concept
+→ skos:prefLabel
+
+Voorbeelden:
+- Type
+- Functie
+- Materiaal
+- StijlEnCultuur
+- Gebeurtenis
+- Omschrijving
+- Naam
+
+Ga niet direct van object naar literal tenzij expliciet aangegeven.
+
+FALLBACKSTRATEGIE GEOMETRIE
+
+Als directe geometrie ontbreekt:
+
+1. probeer bovenliggend object
+2. probeer containerniveau
+3. probeer gebiedsniveau
+4. gebruik OPTIONAL
+5. retourneer object zonder geometrie indien nodig
+
+FALLBACKSTRATEGIE TEKST
+
+Gebruik zoekvolgorde:
+
+1. gestructureerde velden
+2. SKOS-labels
+3. naam
+4. omschrijving
+
+Gebruik omschrijving als laatste redmiddel.
+
+PERFORMANCE
+
+Gebruik:
+- SELECT DISTINCT bij joins
+- LIMIT bij lijstvragen
+- OPTIONAL alleen voor niet-kernvelden
+- FILTER zo vroeg mogelijk
+
+Vermijd:
+- onnodige property paths
+- diepe OPTIONAL-nesting
+- meerdere geometrische joins tegelijk
+- tekstzoeking op omschrijving zonder beperking
+
 CEO IS EEN GELAAGD ERFGOEDMODEL
 
 CEO bevat meerdere typen erfgoedobjecten:
