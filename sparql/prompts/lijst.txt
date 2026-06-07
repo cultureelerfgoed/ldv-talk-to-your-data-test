@@ -348,6 +348,36 @@ Vondsten:
 ?vondst a ceo:Vondsten .
 OPTIONAL { ?vondst ceo:aantalVondsten ?aantal . }
 
+ARCHEOLOGISCHE VONDSTEN
+
+Klasse:
+- ceo:Vondsten
+
+Belangrijke eigenschappen:
+- ceo:aantalVondsten
+- ceo:archis2Vondstnummer
+- ceo:cultuurhistorischObjectnummer
+- ceo:heeftType
+- ceo:heeftMateriaal
+- ceo:heeftToestand
+- ceo:heeftGebeurtenis
+- ceo:ligtInObject
+
+Type labels:
+- skos:prefLabel
+
+Materiaal labels:
+- skos:prefLabel
+
+Toestand labels:
+- skos:prefLabel
+
+Vondstlocatie:
+- ceo:Vondstlocatie
+- ceo:heeftLocatieAanduiding
+- ceo:heeftOmschrijving
+- ceo:bevatObject
+
 Grondsporen:
 
 ?grondspoor a ceo:Grondsporen .
