@@ -176,6 +176,16 @@ def fix_label_filter(query: str) -> str:
         flags=re.IGNORECASE,
     )
 
+def is_incomplete_query(query: str) -> bool:
+    """Geeft True als de SPARQL-query duidelijk onvolledig is."""
+    q = query.strip()
+
+    return (
+        q.count("<") != q.count(">")
+        or q.count("{") != q.count("}")
+        or "SELECT" not in q.upper()
+        or "WHERE" not in q.upper()
+    )
 
 def postprocess(query: str, mode: str) -> str:
     """
@@ -191,8 +201,6 @@ def postprocess(query: str, mode: str) -> str:
     7. Verwijder LIMIT in lijstmodus
     """
     query = query.replace("```sparql", "").replace("```", "").strip()
-    if is_incomplete_query(query):
-        raise ValueError("De gegenereerde SPARQL-query is onvolledig afgekapt.")
 
     query = inject_prefixes(query)
     query = fix_provincie_pad(query)
