@@ -1465,18 +1465,19 @@ function renderTable(bindings, vars) {
 }
 
 
+
 function findGeometryVars(vars) {
   return vars.filter(v => {
-    const name = v.toLowerCase();
+    const n = String(v || '').toLowerCase();
 
     return (
-      name === 'wkt' ||
-      name === 'geometrie' ||
-      name === 'geometry' ||
-      name === 'geo' ||
-      name === 'geom' ||
-      name.includes('wkt') ||
-      name.startsWith('geo')
+      n === 'wkt' ||
+      n === 'geometrie' ||
+      n === 'geometry' ||
+      n === 'geo' ||
+      n === 'geom' ||
+      n.includes('wkt') ||
+      n.startsWith('geo')
     );
   });
 }
@@ -1489,8 +1490,6 @@ function stripCrsFromWkt(wkt) {
 }
 
 function rdToWgs84(x, y) {
-  // Benadering RD New (EPSG:28992) naar WGS84.
-  // Voldoende voor kaartweergave in deze testapp.
   const dX = (x - 155000) * 1e-5;
   const dY = (y - 463000) * 1e-5;
 
@@ -1530,19 +1529,17 @@ function rdToWgs84(x, y) {
 }
 
 function coordToLatLng(pair) {
-  const nums = pair.trim().split(/\s+/).map(Number).filter(n => !Number.isNaN(n));
+  const nums = String(pair || '').trim().split(/\s+/).map(Number).filter(n => !Number.isNaN(n));
 
   if (nums.length < 2) return null;
 
   const x = nums[0];
   const y = nums[1];
 
-  // RD New ligt grofweg in deze range. WKT uit RCE kan RD-coördinaten bevatten.
   if (x > 10000 && y > 300000) {
     return rdToWgs84(x, y);
   }
 
-  // GeoJSON/Leaflet gebruikt lat,lng. WKT gebruikt meestal lon lat.
   return [y, x];
 }
 
@@ -1569,14 +1566,14 @@ function splitTopLevel(value) {
 }
 
 function parseCoordList(value) {
-  return value
+  return String(value || '')
     .split(',')
     .map(coordToLatLng)
     .filter(Boolean);
 }
 
 function unwrapParens(value) {
-  let s = value.trim();
+  let s = String(value || '').trim();
 
   while (s.startsWith('(') && s.endsWith(')')) {
     let depth = 0;
@@ -1603,7 +1600,7 @@ function parseWktToLayers(rawWkt, popupHtml) {
   const wkt = stripCrsFromWkt(rawWkt);
   const typeMatch = wkt.match(/^([A-Z]+)\s*\((.*)\)$/i);
 
-  if (!typeMatch) return [];
+  if (!typeMatch || typeof L === 'undefined') return [];
 
   const type = typeMatch[1].toUpperCase();
   const body = typeMatch[2].trim();
@@ -1664,7 +1661,7 @@ function popupForRow(row, vars) {
 
   const fields = vars
     .filter(v => row[v] && row[v].value && !geometryVars.includes(v))
-    .slice(0, 5)
+    .slice(0, 6)
     .map(v => `<div><strong>${escapeHTML(v)}:</strong> ${formatValue(row[v])}</div>`)
     .join('');
 
@@ -1692,10 +1689,62 @@ function renderMapCard(bindings, vars) {
       </div>
       <div id="resultMap" class="map-wrap"></div>
       <div class="map-note">
-        De kaart wordt automatisch getoond omdat de query WKT-geometrie teruggeeft. Herkent onder meer ?wkt, ?rmWkt, ?gezichtWkt, ?geogez en ?geormn.
+        Gezichten en gebieden worden als vlakken getoond. Rijksmonumenten verschijnen als markers wanneer een apart monument-WKT veld aanwezig is.
       </div>
     </div>
   `;
+}
+
+function styleLayerByVar(layer, geometryVar) {
+  const name = String(geometryVar || '').toLowerCase();
+
+  if (!layer.setStyle) return;
+
+  if (name.includes('rm')) {
+    layer.setStyle({
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.45
+    });
+    return;
+  }
+
+  if (name.includes('gezicht') || name.includes('gez') || name === 'wkt') {
+    layer.setStyle({
+      weight: 2,
+      opacity: 0.85,
+      fillOpacity: 0.12
+    });
+    return;
+  }
+
+  layer.setStyle({
+    weight: 2,
+    opacity: 0.9,
+    fillOpacity: 0.25
+  });
+}
+
+function layerToMarkerIfMonument(layer, geometryVar, popupHtml) {
+  const name = String(geometryVar || '').toLowerCase();
+
+  if (!name.includes('rm')) return layer;
+
+  if (layer.getLatLng) {
+    return layer;
+  }
+
+  if (layer.getBounds) {
+    const center = layer.getBounds().getCenter();
+    return L.circleMarker(center, {
+      radius: 6,
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.9
+    }).bindPopup(popupHtml);
+  }
+
+  return layer;
 }
 
 function initResultMap(bindings, vars) {
@@ -1717,22 +1766,29 @@ function initResultMap(bindings, vars) {
   }).addTo(currentMap);
 
   const geometryVars = findGeometryVars(vars);
-  const group = L.featureGroup();
+  const group = L.featureGroup().addTo(currentMap);
 
   bindings.forEach(row => {
+    const popupHtml = popupForRow(row, vars);
+
     geometryVars.forEach(v => {
       if (!row[v] || !row[v].value) return;
 
-      const layers = parseWktToLayers(row[v].value, popupForRow(row, vars));
-      layers.forEach(layer => group.addLayer(layer));
+      const layers = parseWktToLayers(row[v].value, popupHtml);
+
+      layers.forEach(layer => {
+        styleLayerByVar(layer, v);
+
+        const finalLayer = layerToMarkerIfMonument(layer, v, popupHtml);
+        finalLayer.addTo(group);
+      });
     });
   });
 
   if (group.getLayers().length) {
-    group.addTo(currentMap);
     currentMap.fitBounds(group.getBounds(), {
-      padding: [24, 24],
-      maxZoom: 16,
+      padding: [30, 30],
+      maxZoom: 15,
     });
   }
 
@@ -1771,8 +1827,6 @@ function renderResultsCard(sparqlResults, elapsed) {
         <h4>Resultaten</h4>
       </div>
       <div class="card-body">
-        ${renderMapCard(bindings, vars)}
-
         <div class="result-toolbar">
           <div class="result-count">${escapeHTML(rowText)} gevonden</div>
           <div class="toolbar-actions">
@@ -1782,6 +1836,7 @@ function renderResultsCard(sparqlResults, elapsed) {
         </div>
 
         <div id="cardsView" class="result-cards">
+          ${renderMapCard(bindings, vars)}
           ${renderResultCards(bindings, vars)}
         </div>
 
@@ -1791,7 +1846,7 @@ function renderResultsCard(sparqlResults, elapsed) {
 
         <div class="meta-bar">
           <span>${escapeHTML(elapsed)}s</span>
-          ${bindings.length > 12 ? '<span>eerste 12 als kaarten getoond</span>' : ''}
+          ${bindings.length > 12 ? '<span>eerste 12 als kaart getoond</span>' : ''}
           ${bindings.length > 50 ? '<span>eerste 50 in tabel getoond</span>' : ''}
         </div>
       </div>
