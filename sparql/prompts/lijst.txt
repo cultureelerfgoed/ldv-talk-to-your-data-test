@@ -315,6 +315,15 @@ LIMIT 50
 
 Als sfWithin geen resultaten geeft, mag sfIntersects als fallback gebruikt worden.
 
+Bij ruimtelijke queries met een gebied en objecten:
+- Selecteer altijd beide geometrieën.
+- Gebruik ?gezichtWkt voor het gebied.
+- Gebruik ?rmWkt voor het rijksmonument.
+- Zet beide in SELECT, anders kan de frontend de objecten niet op de kaart tonen.
+
+Goed:
+SELECT DISTINCT ?gezicht ?rm ?gezichtsnummer ?gezichtsnaam ?nummer ?naam ?gezichtWkt ?rmWkt ?bron
+
 ARCHEOLOGISCHE OBJECTEN:
 Gebruik deze classes alleen als de gebruiker daar expliciet naar vraagt.
 
