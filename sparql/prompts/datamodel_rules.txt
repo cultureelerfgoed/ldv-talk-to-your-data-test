@@ -36,6 +36,48 @@ ALGEMENE REGELS
 - Gebruik OPTIONAL voor naam, omschrijving, adres, type, functie en geometrie.
 - Gebruik geen SELECT *.
 
+CEO IS EEN GELAAGD ERFGOEDMODEL
+
+CEO bevat meerdere typen erfgoedobjecten:
+
+1. Puntobjecten
+- gebouwen
+- objecten
+- vondsten
+
+2. Gebiedsobjecten
+- stadsgezichten
+- dorpsgezichten
+- onderzoeksgebieden
+- terreinen
+
+3. Hiërarchische objecten
+- complexen
+- vondstlocaties
+- terreinen
+
+4. Status- en aanwijzingslagen
+- werelderfgoed
+- bescherming
+- waardering
+
+Gebruik verschillende querystrategieën per objecttype.
+
+Puntobjecten:
+- meestal directe geometrie
+
+Gebiedsobjecten:
+- polygon geometrie
+- meerdere relaties
+- DISTINCT gebruiken
+
+Hiërarchische objecten:
+- bevatObject / ligtInObject navigatie
+
+Statuslagen:
+- verwijzen naar andere objecten
+- vaak geen zelfstandig fysiek object
+
 OBJECTPROPERTIES EN DATATYPEPROPERTIES
 
 In de CEO geldt als vuistregel:
@@ -1082,4 +1124,94 @@ Geometrie zit meestal op gekoppeld onderzoeksgebied:
 
 ?vondstlocatie ceo:ligtInObject ?onderzoeksgebied .
 ?onderzoeksgebied ceo:heeftGeometrie/geo:asWKT ?wkt .
+
+MONUMENTENCOMPLEXEN
+
+Gebruik ceo:Complex voor monumentcomplexen.
+
+Complexen zijn hiërarchische container-objecten.
+
+Gebruik:
+- ceo:bevatObject voor onderdelen binnen complex
+- ceo:ligtInObject voor bovenliggend complex
+
+Voorbeelden:
+- kerkcomplex
+- fabrieksterrein
+- vestingcomplex
+- buitenplaatscomplex
+- kloostercomplex
+
+Complex naar onderdelen:
+?complex ceo:bevatObject ?onderdeel .
+
+Onderdeel naar complex:
+?onderdeel ceo:ligtInObject ?complex .
+
+Gebruik DISTINCT vrijwel altijd bij complexqueries.
+Onderdelen veroorzaken snel duplicaten.
+
+Geometrie kan:
+- direct op complex zitten
+- alleen op onderdeel zitten
+- alleen op bovenliggend monument zitten
+
+Gebruik daarom OPTIONAL geometrieblokken.
+
+STADS- EN DORPSGEZICHTEN
+
+Beschermde stads- en dorpsgezichten zijn gebiedsobjecten.
+
+Gebruik polygon-geometrie via:
+?object ceo:heeftGeometrie ?geoObj .
+?geoObj geo:asWKT ?wkt .
+
+Gebruik bij gebiedsobjecten altijd:
+SELECT DISTINCT
+
+Gebiedsobjecten kunnen:
+- meerdere woonplaatsen hebben
+- meerdere BAG-relaties hebben
+- meerdere monumenten bevatten
+
+Gebruik:
+?gezicht ceo:bevatObject ?object .
+
+Niet alle objecten binnen een gezicht zijn rijksmonumenten.
+
+Gebruik omschrijving vaker bij gezichten.
+Belangrijke informatie zit vaak in tekstuele beschrijvingen.
+
+Bij kaartvragen:
+Gebruik polygon-WKT rechtstreeks.
+Niet reduceren naar centroid.
+
+WERELDERFGOED
+
+Werelderfgoed is een status- of aanwijzingslaag.
+
+Werelderfgoed-objecten kunnen verwijzen naar:
+- rijksmonumenten
+- complexen
+- gebieden
+- landschappen
+
+Behandel werelderfgoed niet automatisch als fysiek object.
+
+Gebruik relaties naar onderliggende objecten.
+
+Gebruik DISTINCT vrijwel altijd.
+
+Werelderfgoed-geometrie:
+- kan direct aanwezig zijn
+- kan afgeleid moeten worden uit onderliggende objecten
+
+Gebruik OPTIONAL geometrieblokken.
+
+Omschrijving en motivatie zijn belangrijk bij werelderfgoed.
+Gebruik:
+?object ceo:heeftOmschrijving ?omschrijvingObj .
+?omschrijvingObj ceo:omschrijving ?omschrijving .
+
+Gebruik bij werelderfgoed vaker tekstvelden dan bij gewone monumentqueries.
 
