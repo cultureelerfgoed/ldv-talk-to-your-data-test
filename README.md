@@ -22,6 +22,10 @@ De applicatie is geoptimaliseerd voor de Cultureel Erfgoed Ontologie (CEO) en be
 - Voer SPARQL direct uit op het RCE endpoint
 - Krijg een leesbaar Nederlands antwoord
 - Exporteer resultaten als CSV
+- Interactieve kaartweergave via Leaflet
+- Automatische herkenning van WKT-geometrie
+- Ondersteuning voor ruimtelijke queries (geof:sfWithin, geof:sfIntersects)
+- Automatische detectie van lijst- of tellingvragen
 
 Ondersteunde objecttypen:
 
@@ -36,6 +40,9 @@ Ondersteunde objecttypen:
 - Actoren
 - Materialen
 - Stijlen
+- Beschermde gezichten
+- Werelderfgoed
+- Vondstlocaties
 
 ---
 
@@ -47,6 +54,9 @@ Ondersteunde objecttypen:
 - Hoeveel kerken zijn er in Utrecht?
 - Welke archeologische rijksmonumenten zijn er in Utrecht?
 - Welke kastelen staan er in Gelderland?
+- Welke rijksmonumenten liggen binnen beschermd gezicht Dordrecht?
+- Welke kerken liggen binnen een beschermd gezicht?
+- Welke werelderfgoedlocaties zijn er?
 
 ## Architectuur
 
@@ -60,14 +70,16 @@ Ondersteunde objecttypen:
 - Welke archeologische terreinen zijn er in Limburg?
 - Welke vondsten bevatten aardewerk?
 - Welke grondsporen horen bij een vondstlocatie?
-
+- Toon archeologische terreinen op de kaart
+- Welke Romeinse vondsten liggen in Nuth?
 ---
 
 # Architectuur
 
 ```text
 frontend/
-  index.html                 — gebruikersinterface
+  index.html                 — basisinterface
+  index_with_map.html        — interface met Leaflet kaart
 
 answer/
   answer_generator.py        — genereert leesbare antwoorden
@@ -78,9 +90,9 @@ sparql/
   sparql_generator.py        — genereert SPARQL via LLM
 
   prompts/
-    lijst.txt                — prompt voor lijstvragen
-    telling.txt              — prompt voor tellingen
-    datamodel_rules.txt      — CEO datamodelregels en querypatronen
+    lijst.txt                — regels voor lijstqueries
+    telling.txt              — regels voor tellingqueries
+    datamodel_rules.txt      — centrale CEO kennisbasis
 
 config.py                    — configuratie
 app.py                       — Flask backend
@@ -193,29 +205,56 @@ http://127.0.0.1:5000
 
 # Datamodelregels
 
-De applicatie gebruikt aanvullende regels in:
+De applicatie gebruikt een centrale kennisbasis in:
 
-```text
 sparql/prompts/datamodel_rules.txt
-```
 
-Deze regels helpen de LLM om:
+Dit bestand bevat:
 
-- geldige CEO classes te gebruiken
-- correcte property-paden te kiezen
-- hallucinaties te voorkomen
-- betere SPARQL queries te genereren
+- CEO classes
+- property paths
+- archeologische patronen
+- geometrische relaties
+- BAG/BRK-structuren
+- gezichten
+- werelderfgoed
+- ActorEnRol patronen
+- functie- en typepaden
+
+lijst.txt en telling.txt bevatten alleen gedragsregels voor respectievelijk lijst- en tellingqueries.
 
 ---
 
+# Kaartfunctionaliteit
+
+De applicatie ondersteunt automatische kaartweergave via Leaflet.
+
+Wanneer een query WKT-geometrie teruggeeft, toont de frontend automatisch:
+
+- punten
+- lijnen
+- polygonen
+- multipolygonen
+
+Ondersteunde WKT-velden:
+
+- ?wkt
+- ?rmWkt
+- ?gezichtWkt
+- ?gebiedWkt
+
+Bij ruimtelijke queries kunnen meerdere geometrieën tegelijk worden weergegeven, bijvoorbeeld:
+
+- beschermd gezicht als vlak
+- rijksmonumenten als punten
+
 # Bekende beperkingen
 
-- Niet alle CEO-relaties zijn volledig gedocumenteerd
-- Sommige architectgegevens zijn literals
-- Sommige locatiepaden verschillen per objecttype
-- Archeologische objecten gebruiken andere structuurpatronen dan rijksmonumenten
-- Synoniemenherkenning blijft beperkt
-- Grote queries kunnen traag zijn
+- Grote geometrische queries kunnen timeouts veroorzaken
+- Ruimtelijke queries via geof:sfWithin kunnen traag zijn
+- Sommige geometrieën ontbreken in de brondata
+- Sommige objecttypen gebruiken inconsistente CEO-structuren
+- Grote prompts kunnen bij kleinere LLM's incomplete SPARQL opleveren
 
 ---
 
