@@ -341,3 +341,66 @@ OPTIONAL {
 Of verplicht als de gebruiker expliciet een kaart wil:
 
 ?cho ceo:heeftGeometrie/geo:asWKT ?wkt .
+
+GEOSPATIAL RELATIES
+
+Gebruik GeoSPARQL wanneer de gebruiker vraagt naar ruimtelijke relaties, zoals:
+- rijksmonumenten binnen een gezicht
+- monumenten in een beschermd gezicht
+- objecten binnen werelderfgoed
+- objecten binnen een gebied
+- wat ligt binnen
+- wat valt binnen
+- welke objecten liggen in dit gebied
+
+Gebruik deze extra prefixen:
+
+PREFIX gsp: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+
+Let op:
+In sommige bestaande querypatronen wordt gsp: gebruikt voor GeoSPARQL.
+Gebruik dan gsp:asWKT.
+
+Voor simpele kaartweergave mag ook geo:asWKT gebruikt worden als geo: is gedefinieerd.
+Gebruik niet tegelijk geo: en gsp: voor hetzelfde patroon binnen één query.
+
+Correct patroon voor geometrie:
+
+?object ceo:heeftGeometrie/gsp:asWKT ?wkt .
+
+Ruimtelijke filter:
+
+FILTER(geof:sfWithin(?wktObject, ?wktGebied))
+
+Voorbeeld: rijksmonumenten binnen beschermde gezichten:
+
+SELECT ?ge ?rm ?gezichtnummer ?gezichtsnaam ?rmn ?oorspronkelijkeFunctie ?geogez ?geormn
+WHERE {
+  GRAPH graph:instanties-rce {
+    ?ge a ceo:Gezicht ;
+        ceo:gezichtsnummer ?gezichtnummer ;
+        ceo:heeftNaam/ceo:naam ?gezichtsnaam ;
+        ceo:heeftGeometrie/gsp:asWKT ?geogez .
+
+    ?rm a ceo:Rijksmonument ;
+        ceo:rijksmonumentnummer ?rmn ;
+        ceo:heeftGeometrie/gsp:asWKT ?geormn .
+
+    OPTIONAL {
+      ?rm ceo:heeftOorspronkelijkeFunctie/ceo:heeftFunctieNaam ?functie .
+    }
+
+    FILTER(geof:sfWithin(?geormn, ?geogez))
+  }
+
+  GRAPH graph:bebouwdeomgeving {
+    OPTIONAL {
+      ?functie skos:broader/skos:prefLabel ?oorspronkelijkeFunctie .
+    }
+  }
+}
+ORDER BY ?gezichtnummer ?rmn
+
+Gebruik bij voorkeur gsp:asWKT.
+Gebruik geo:asWKT alleen als de query al geo: definieert.

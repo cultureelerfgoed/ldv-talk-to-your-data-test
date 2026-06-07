@@ -40,10 +40,13 @@ FLASK_DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 
 SPARQL_PREFIXES = """\
 PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
+PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX gsp: <http://www.opengis.net/ont/geosparql#>
 PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"""
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>"""
 
 # Exacte provincie URIs uit de OWMS thesaurus
 # Alle gangbare spelwijzen mappen naar één URI per provincie
