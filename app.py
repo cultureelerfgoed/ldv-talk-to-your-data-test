@@ -92,6 +92,23 @@ def health():
         }
     )
 
+def detect_mode(question: str) -> str:
+    q = question.lower()
+
+    telling_triggers = [
+        "hoeveel",
+        "aantal",
+        "tel ",
+        "telling",
+        "how many",
+        "count",
+    ]
+
+    if any(x in q for x in telling_triggers):
+        return "telling"
+
+    return "lijst"
+
 
 @app.route("/api/generate-sparql", methods=["POST"])
 def generate_sparql():
@@ -99,7 +116,10 @@ def generate_sparql():
 
     data = request.get_json(silent=True) or {}
     question = (data.get("question") or "").strip()
-    mode = data.get("mode", "lijst")
+    mode = data.get("mode")
+
+    if not mode:
+        mode = detect_mode(question)
 
     if not question:
         return jsonify({"error": "Geen vraag opgegeven"}), 400
