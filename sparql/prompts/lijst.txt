@@ -162,3 +162,36 @@ SELECT DISTINCT
 ?gezichtWkt
 
 De frontend gebruikt deze WKT-velden om zowel vlakken als monumenten op de kaart te tonen.
+Bij vragen zoals:
+- rijksmonumenten in een gezicht
+- monumenten binnen een gezicht
+- monumenten liggen in een gezicht
+- in beschermd gezicht
+- binnen beschermd gezicht
+
+gebruik NOOIT:
+?rm ceo:ligtInObject ?gezicht .
+
+Gebruik altijd geometrie:
+
+?gezicht a ceo:Gezicht .
+?gezicht ceo:heeftGeometrie/gsp:asWKT ?gezichtWkt .
+
+?rm a ceo:Rijksmonument .
+?rm ceo:heeftGeometrie/gsp:asWKT ?rmWkt .
+
+FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
+
+Selecteer altijd:
+?gezichtWkt
+?rmWkt
+
+Maak ?rmWkt en ?gezichtWkt verplicht, niet OPTIONAL.
+
+Als de gebruiker vraagt “hebben de functie kerk” of “zijn een kerk”:
+zet de functie/type-match NIET in OPTIONAL.
+
+Gebruik een verplicht UNION-blok over:
+- ceo:heeftOorspronkelijkeFunctie
+- ceo:heeftHuidigeFunctie
+- ceo:heeftKennisregistratie a ceo:Type
