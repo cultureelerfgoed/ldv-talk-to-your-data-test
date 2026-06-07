@@ -110,3 +110,55 @@ OUTPUT:
 - Sluit alle PREFIX-regels volledig af met >.
 - Sluit alle accolades.
 - Gebruik geen markdown.
+
+BIJ RUIMTELIJKE VRAGEN:
+
+Als de gebruiker vraagt naar:
+
+* binnen een gezicht
+* in een gezicht
+* binnen beschermd gezicht
+* binnen werelderfgoed
+* ligging
+* kaart
+* geometrie
+* waar liggen
+
+gebruik dan geometrische relaties in plaats van alleen ceo:ligtInObject.
+
+Gebruik:
+
+* geof:sfWithin
+* geof:sfIntersects
+
+Gebruik altijd aparte WKT-velden:
+
+* ?rmWkt voor rijksmonumenten
+* ?gezichtWkt voor gezichten
+* ?gebiedWkt voor gebieden
+* ?werelderfgoedWkt voor werelderfgoed
+
+Voorbeeld:
+
+?gezicht a ceo:Gezicht .
+?gezicht ceo:heeftNaam/ceo:naam ?gezichtsnaam .
+?gezicht ceo:heeftGeometrie/gsp:asWKT ?gezichtWkt .
+
+?rm a ceo:Rijksmonument .
+?rm ceo:rijksmonumentnummer ?nummer .
+?rm ceo:heeftGeometrie/gsp:asWKT ?rmWkt .
+
+FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
+
+Selecteer altijd beide geometrieën:
+
+SELECT DISTINCT
+?rm
+?nummer
+?naam
+?gezicht
+?gezichtsnaam
+?rmWkt
+?gezichtWkt
+
+De frontend gebruikt deze WKT-velden om zowel vlakken als monumenten op de kaart te tonen.
