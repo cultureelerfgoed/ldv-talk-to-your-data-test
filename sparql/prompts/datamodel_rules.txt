@@ -293,9 +293,6 @@ FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
 Gebruik nooit:
 ?rm ceo:ligtInObject ?gezicht .
 
-ceo:Gezicht gebruikt geometrieën via:
-ceo:heeftGeometrie/gsp:asWKT
-
 GEZICHTEN
 
 ?gezicht a ceo:Gezicht .
@@ -448,36 +445,3 @@ OPTIONAL {
   ?terrein ceo:heeftArcheologischeWaardering ?waarderingConcept .
   ?waarderingConcept skos:prefLabel ?waardering .
 }
-
-RUIMTELIJKE PERFORMANCE
-
-Bij rijksmonumenten binnen een gezicht:
-filter het Gezicht altijd eerst op naam voordat geof:sfWithin wordt gebruikt.
-Gebruik dus verplicht:
-?gezicht ceo:heeftNaam ?gezichtNaamNode .
-?gezichtNaamNode ceo:naam ?gezichtsnaam .
-FILTER(CONTAINS(LCASE(STR(?gezichtsnaam)), "dordrecht"))
-
-Doe dit vóór:
-FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
-
-Bij geof:sfWithin of geof:sfIntersects:
-
-* beperk eerst het gebiedobject vóór de geometrische vergelijking
-* filter eerst op naam, gemeente, provincie of identifier
-* voer daarna pas geof:sfWithin uit
-
-Slecht:
-?gezicht a ceo:Gezicht .
-FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
-
-Goed:
-?gezicht a ceo:Gezicht .
-?gezicht ceo:heeftNaam ?naamNode .
-?naamNode ceo:naam ?gezichtsnaam .
-FILTER(CONTAINS(LCASE(STR(?gezichtsnaam)), "dordrecht"))
-
-FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
-
-Beperk geometrische vergelijkingen altijd zo vroeg mogelijk.
-
