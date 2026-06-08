@@ -293,6 +293,18 @@ FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
 Gebruik nooit:
 ?rm ceo:ligtInObject ?gezicht .
 
+ceo:Gezicht gebruikt geometrieën via:
+ceo:heeftGeometrie/gsp:asWKT
+
+Rijksmonumenten binnen een Gezicht:
+- gebruik geometrische relaties
+- gebruik geof:sfWithin
+- vergelijk geometrie van Rijksmonument met geometrie van Gezicht
+
+Selecteer bij kaartvragen:
+- ?gezichtWkt
+- ?rmWkt
+
 GEZICHTEN
 
 ?gezicht a ceo:Gezicht .

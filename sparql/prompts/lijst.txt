@@ -99,5 +99,47 @@ RIJKSMONUMENTEN BINNEN EEN GEZICHT:
 - Als ook gemeente wordt gevraagd, filter via BRK/gemeentenaam.
 - Als ook gezichtsnaam wordt gevraagd, filter op ?gezichtsnaam.
 
+Selecteer bij vragen over rijksmonumenten binnen een Gezicht altijd beide geometrieën:
+- ?gezichtWkt voor de geometrie van het Gezicht
+- ?rmWkt voor de geometrie van het Rijksmonument
+
+Gebruik niet alleen ?wkt, want dan raak je de gebiedsgeometrie kwijt.
+
+GEZICHTEN EN GEOMETRISCHE RELATIES
+
+Als de gebruiker vraagt:
+- welke rijksmonumenten liggen binnen een gezicht
+- welke monumenten liggen binnen beschermd gezicht
+- welke monumenten liggen in beschermd stadsgezicht
+
+gebruik dan geometrische relaties via GeoSPARQL.
+
+Gebruik:
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX gsp: <http://www.opengis.net/ont/geosparql#>
+
+Gebruik:
+FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
+
+Selecteer altijd beide geometrieën:
+- ?gezichtWkt
+- ?rmWkt
+
+Voorbeeld:
+SELECT DISTINCT ?gezicht ?rm ?gezichtsnummer ?gezichtsnaam ?nummer ?naam ?functieLabel ?bron ?gezichtWkt ?rmWkt
+WHERE {
+  GRAPH graph:instanties-rce {
+    ?gezicht a ceo:Gezicht ;
+      ceo:gezichtsnummer ?gezichtsnummer ;
+      ceo:heeftNaam/ceo:naam ?gezichtsnaam ;
+      ceo:heeftGeometrie/gsp:asWKT ?gezichtWkt .
+
+    ?rm a ceo:Rijksmonument ;
+      ceo:rijksmonumentnummer ?nummer ;
+      ceo:heeftGeometrie/gsp:asWKT ?rmWkt .
+  }
+}
+
 OUTPUT:
 - Geef alleen geldige SPARQL.
+
