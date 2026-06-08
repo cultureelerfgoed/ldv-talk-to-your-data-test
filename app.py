@@ -75,7 +75,7 @@ CORS(app)
 @app.route("/")
 def index():
     """Serveer de frontend."""
-    return app.send_static_file("index.html")
+    return app.send_static_file("index_with_map.html")
 
 
 @app.route("/api/health", methods=["GET"])
