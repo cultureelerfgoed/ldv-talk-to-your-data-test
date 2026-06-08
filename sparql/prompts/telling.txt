@@ -34,6 +34,23 @@ ABSOLUTE REGELS:
 - Gebruik omschrijvingen alleen als fallback of als de gebruiker expliciet om tekst/omschrijving vraagt.
 - Gebruik bij omschrijvingszoekpaden REGEX met woordgrenzen.
 
+VOORRANGSREGEL PROVINCIE
+
+Als de gebruiker vraagt naar een telling in een provincie, gebruik altijd ceo:heeftProvincie via ceo:heeftBasisregistratieRelatie.
+
+Gebruik nooit geometrie, WKT, geof:sfWithin of geof:sfIntersects voor provincievragen.
+
+Voorbeeld:
+
+SELECT (COUNT(DISTINCT ?rm) AS ?aantal)
+WHERE {
+  GRAPH graph:instanties-rce {
+    ?rm a ceo:Rijksmonument .
+    ?rm ceo:heeftBasisregistratieRelatie ?relatie .
+    ?relatie ceo:heeftProvincie <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)> .
+  }
+}
+
 HOOFDVARIABELEN:
 - ?rm voor ceo:Rijksmonument
 - ?complex voor ceo:Complex of ceo:ArcheologischComplex
@@ -126,18 +143,6 @@ Provincie:
 
 Gebruik nooit:
 ?rm ceo:heeftProvincie ?provincie .
-
-VOORBEELD: TELLING RIJKSMONUMENTEN IN GEMEENTE
-SELECT (COUNT(DISTINCT ?rm) AS ?aantal)
-WHERE {
-  GRAPH graph:instanties-rce {
-    ?rm a ceo:Rijksmonument .
-    ?rm ceo:heeftBasisregistratieRelatie ?relatie .
-    ?relatie ceo:heeftBRKRelatie ?brk .
-    ?brk ceo:gemeentenaam ?gemeente .
-    FILTER(CONTAINS(LCASE(STR(?gemeente)), "bunnik"))
-  }
-}
 
 VOORBEELD: TELLING PER GEMEENTE
 SELECT ?gemeente (COUNT(DISTINCT ?rm) AS ?aantal)
@@ -391,6 +396,18 @@ WHERE {
     ?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
     ?onderzoeksgebied ceo:heeftBasisregistratieRelatie ?relatie .
     ?relatie ceo:heeftProvincie <PROVINCIE_URI> .
+  }
+}
+
+VOORBEELD: TELLING RIJKSMONUMENTEN IN GEMEENTE
+SELECT (COUNT(DISTINCT ?rm) AS ?aantal)
+WHERE {
+  GRAPH graph:instanties-rce {
+    ?rm a ceo:Rijksmonument .
+    ?rm ceo:heeftBasisregistratieRelatie ?relatie .
+    ?relatie ceo:heeftBRKRelatie ?brk .
+    ?brk ceo:gemeentenaam ?gemeente .
+    FILTER(CONTAINS(LCASE(STR(?gemeente)), "bunnik"))
   }
 }
 
