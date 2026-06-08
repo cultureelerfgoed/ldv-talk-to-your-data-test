@@ -277,7 +277,12 @@ WHERE {
     ?actorEnRol ceo:heeftActor ?actor .
     ?actorEnRol ceo:heeftRol ?rol .
 
+    Voor brede actorzoekvraag:
     FILTER(CONTAINS(LCASE(STR(?actor)), "kramer"))
+
+    Voor precieze actorzoekvraag met initiaal:
+    FILTER(REGEX(LCASE(STR(?actor)), "^kramer,\\s*h\\.?($|\\s|;|,)"))
+    
     FILTER(CONTAINS(LCASE(STR(?rol)), "architect"))
 
     OPTIONAL {
@@ -287,6 +292,38 @@ WHERE {
   }
 }
 LIMIT 20
+
+ACTORNAAM PRECIES FILTEREN
+
+Als de gebruiker een actor noemt met achternaam en initiaal, zoals:
+- "Cuypers, P."
+- "Kramer, H."
+- "Boosten, A."
+
+gebruik dan geen brede CONTAINS op alleen de achternaam.
+
+Fout:
+FILTER(CONTAINS(LCASE(STR(?actor)), "cuypers"))
+
+Goed:
+FILTER(REGEX(LCASE(STR(?actor)), "^cuypers,\\s*p\\.?($|\\s|;|,)"))
+
+Dit matcht:
+- Cuypers, P
+- Cuypers, P.
+- Cuypers, P ; andere tekst
+- Cuypers, P. ; andere tekst
+
+Dit matcht niet:
+- Cuypers, P.J.H.
+- Cuypers, Eduard
+- Cuypers, Jos
+
+Als de gebruiker alleen "Cuypers" vraagt, gebruik dan wel:
+FILTER(CONTAINS(LCASE(STR(?actor)), "cuypers"))
+
+Als de gebruiker "Cuypers, P." vraagt, gebruik:
+FILTER(REGEX(LCASE(STR(?actor)), "^cuypers,\\s*p\\.?($|\\s|;|,)"))
 
 GEOMETRIE EN KAART:
 - Neem bij rijksmonument-lijstvragen standaard ?wkt op in SELECT en voeg geometrie optioneel toe.
@@ -492,32 +529,58 @@ WHERE {
 ORDER BY DESC(?aantal)
 LIMIT 20
 
-Bij vragen naar Romeinse vondsten mag datering NIET in OPTIONAL staan.
-De periode is dan een verplicht filtercriterium.
+ROMEINSE VONDSTEN:
 
-Gebruik:
+Bij vragen naar Romeinse vondsten:
 
-?vondst ceo:heeftGebeurtenis ?gebeurtenis .
-?gebeurtenis ceo:heeftDatering ?datering .
+- gebruik ceo:Vondsten
+- gebruik datering via ceo:heeftGebeurtenis en ceo:heeftDatering
+- filter op periodeLabel
+- gebruik geen OPTIONAL voor periode of locatie als daarop gefilterd wordt
+- selecteer altijd ?periodeLabel
 
-{
-  ?datering ceo:heeftBeginDatering ?begin .
-  ?begin ceo:heeftPeriode ?periode .
-  ?periode skos:prefLabel ?periodeLabel .
+Voorbeeld:
+
+SELECT DISTINCT ?vondst ?locatie ?locatienaam ?periodeLabel ?typeLabel ?materiaalLabel
+WHERE {
+  GRAPH graph:instanties-rce {
+
+    ?vondst a ceo:Vondsten .
+
+    ?vondst ceo:ligtInObject ?locatie .
+    ?locatie a ceo:Vondstlocatie .
+
+    ?locatie ceo:heeftLocatieAanduiding ?locObj .
+    ?locObj ceo:locatienaam ?locatienaam .
+
+    FILTER(CONTAINS(LCASE(STR(?locatienaam)), "nuth"))
+
+    ?vondst ceo:heeftGebeurtenis ?gebeurtenis .
+    ?gebeurtenis ceo:heeftDatering ?datering .
+
+    {
+      ?datering ceo:heeftBeginDatering ?begin .
+      ?begin ceo:heeftPeriode ?periode .
+      ?periode skos:prefLabel ?periodeLabel .
+    }
+    UNION
+    {
+      ?datering ceo:heeftEindDatering ?eind .
+      ?eind ceo:heeftPeriode ?periode .
+      ?periode skos:prefLabel ?periodeLabel .
+    }
+
+    FILTER(CONTAINS(LCASE(STR(?periodeLabel)), "romeins"))
+
+    OPTIONAL {
+      ?vondst ceo:heeftType/ceo:heeftTypeNaam/skos:prefLabel ?typeLabel .
+    }
+
+    OPTIONAL {
+      ?vondst ceo:heeftMateriaal/ceo:heeftMateriaalNaam/skos:prefLabel ?materiaalLabel .
+    }
+  }
 }
-UNION
-{
-  ?datering ceo:heeftEindDatering ?eind .
-  ?eind ceo:heeftPeriode ?periode .
-  ?periode skos:prefLabel ?periodeLabel .
-}
-
-FILTER(CONTAINS(LCASE(STR(?periodeLabel)), "romeins"))
-
-Selecteer altijd ?periodeLabel.
-
-ceo:heeftPeriode ?periode .
-?periode skos:prefLabel ?periodeLabel .
 
 OUTPUT:
 - Geef alleen geldige SPARQL.

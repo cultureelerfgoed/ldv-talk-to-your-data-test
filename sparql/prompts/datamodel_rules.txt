@@ -259,6 +259,9 @@ ACTOREN EN ROLLEN
 ?actorEnRol ceo:heeftActor ?actor .
 ?actorEnRol ceo:heeftRol ?rol .
 
+Als een actorliteral meerdere personen kan bevatten of initialen bevat, gebruik REGEX voor precieze naamfilters.
+Gebruik CONTAINS alleen voor brede achternaamvragen.
+
 Voor architectvragen:
 FILTER(CONTAINS(LCASE(STR(?rol)), "architect"))
 
