@@ -203,8 +203,9 @@ if __name__ == "__main__":
     logger.info("Model: %s", current_model_name())
     logger.info("Server start op poort %d", port)
 
-    app.run(
-        host="0.0.0.0",
-        debug=config.FLASK_DEBUG,
-        port=port,
-    )
+app.run(
+    host="0.0.0.0",
+    debug=config.FLASK_DEBUG,
+    port=port,
+    use_reloader=False,
+)
