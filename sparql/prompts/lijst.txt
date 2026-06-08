@@ -10,7 +10,7 @@ PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-PREFIX gsp: <http://www.opengis.net/ont/geosparql#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 
 ABSOLUTE REGELS:
@@ -273,7 +273,7 @@ GEOMETRIE EN KAART:
 
 Gewone kaartquery:
 OPTIONAL {
-  ?rm ceo:heeftGeometrie/gsp:asWKT ?wkt .
+  ?rm ceo:heeftGeometrie/geo:asWKT ?wkt .
 }
 
 RIJKSMONUMENTEN BINNEN EEN GEZICHT:
@@ -293,11 +293,11 @@ WHERE {
     ?gezicht a ceo:Gezicht ;
       ceo:gezichtsnummer ?gezichtsnummer ;
       ceo:heeftNaam/ceo:naam ?gezichtsnaam ;
-      ceo:heeftGeometrie/gsp:asWKT ?gezichtWkt .
+      ceo:heeftGeometrie/geo:asWKT ?gezichtWkt .
 
     ?rm a ceo:Rijksmonument ;
       ceo:rijksmonumentnummer ?nummer ;
-      ceo:heeftGeometrie/gsp:asWKT ?rmWkt .
+      ceo:heeftGeometrie/geo:asWKT ?rmWkt .
 
     OPTIONAL {
       ?rm ceo:heeftNaam/ceo:naam ?naam .
@@ -316,11 +316,11 @@ WHERE {
     ?gezicht a ceo:Gezicht ;
       ceo:gezichtsnummer ?gezichtsnummer ;
       ceo:heeftNaam/ceo:naam ?gezichtsnaam ;
-      ceo:heeftGeometrie/gsp:asWKT ?gezichtWkt .
+      ceo:heeftGeometrie/geo:asWKT ?gezichtWkt .
 
     ?rm a ceo:Rijksmonument ;
       ceo:rijksmonumentnummer ?nummer ;
-      ceo:heeftGeometrie/gsp:asWKT ?rmWkt .
+      ceo:heeftGeometrie/geo:asWKT ?rmWkt .
 
     OPTIONAL {
       ?rm ceo:heeftNaam/ceo:naam ?naam .
@@ -369,7 +369,7 @@ WHERE {
     ?gezicht a ceo:Gezicht .
     OPTIONAL { ?gezicht ceo:gezichtsnummer ?gezichtsnummer . }
     OPTIONAL { ?gezicht ceo:heeftNaam/ceo:naam ?gezichtsnaam . }
-    OPTIONAL { ?gezicht ceo:heeftGeometrie/gsp:asWKT ?wkt . }
+    OPTIONAL { ?gezicht ceo:heeftGeometrie/geo:asWKT ?wkt . }
   }
 }
 LIMIT 20
@@ -384,7 +384,7 @@ WHERE {
     ?werelderfgoed a ceo:Werelderfgoed .
     OPTIONAL { ?werelderfgoed ceo:werelderfgoednummer ?werelderfgoednummer . }
     OPTIONAL { ?werelderfgoed ceo:heeftNaam/ceo:naam ?naam . }
-    OPTIONAL { ?werelderfgoed ceo:heeftGeometrie/gsp:asWKT ?wkt . }
+    OPTIONAL { ?werelderfgoed ceo:heeftGeometrie/geo:asWKT ?wkt . }
   }
 }
 LIMIT 20
