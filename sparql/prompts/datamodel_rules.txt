@@ -15,7 +15,6 @@ PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-PREFIX gsp: <http://www.opengis.net/ont/geosparql#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 
 Gebruik nooit:
@@ -271,9 +270,9 @@ Gewone kaartweergave:
 
 Ruimtelijke relatie:
 ?object ceo:heeftGeometrie ?objectGeometrie .
-?objectGeometrie gsp:asWKT ?objectWkt .
+?objectGeometrie geo:asWKT ?objectWkt .
 ?gebied ceo:heeftGeometrie ?gebiedGeometrie .
-?gebiedGeometrie gsp:asWKT ?gebiedWkt .
+?gebiedGeometrie geo:asWKT ?gebiedWkt .
 FILTER(geof:sfWithin(?objectWkt, ?gebiedWkt))
 
 Bij geof:sfWithin of geof:sfIntersects:
@@ -284,10 +283,10 @@ Bij geof:sfWithin of geof:sfIntersects:
 Rijksmonumenten binnen een gezicht:
 ?gezicht a ceo:Gezicht .
 ?gezicht ceo:heeftGeometrie ?gezichtGeometrie .
-?gezichtGeometrie gsp:asWKT ?gezichtWkt .
+?gezichtGeometrie geo:asWKT ?gezichtWkt .
 ?rm a ceo:Rijksmonument .
 ?rm ceo:heeftGeometrie ?rmGeometrie .
-?rmGeometrie gsp:asWKT ?rmWkt .
+?rmGeometrie geo:asWKT ?rmWkt .
 FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt))
 
 Gebruik nooit:
