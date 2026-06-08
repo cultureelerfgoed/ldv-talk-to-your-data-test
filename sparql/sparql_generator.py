@@ -30,17 +30,19 @@ def _load_optional_prompt(name: str) -> str:
 
 def _build_system_prompt(mode: str) -> str:
     """
-    Bouw de volledige system prompt.
+    Bouw de system prompt.
 
-    De basisprompt bepaalt de modus:
-    - lijst
-    - telling
-
-    datamodel_rules.txt bevat harde regels uit de CEO ontologie en uit bewezen instance-patronen.
-    Die regels beperken hallucinaties in classes, properties en property-paden.
+    Belangrijk:
+    - telling.txt moet klein en strak blijven
+    - datamodel_rules.txt is te groot voor simpele tellingen
+    - lijstvragen mogen wel de volledige datamodelregels gebruiken
     """
 
     base_prompt = _load_prompt(mode)
+
+    if mode == "telling":
+        return base_prompt
+
     datamodel_rules = _load_optional_prompt("datamodel_rules")
 
     parts = [base_prompt]
