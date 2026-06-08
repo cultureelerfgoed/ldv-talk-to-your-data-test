@@ -4,100 +4,319 @@ Genereer een SELECT-query die individuele resultaten teruggeeft.
 Gebruik datamodel_rules.txt als enige bron voor CEO-classes, properties, property paths, geometrie, archeologie, gezichten, werelderfgoed, functies, types en SKOS-concepten.
 
 VASTE PREFIXEN:
-PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
-PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
-PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-PREFIX gsp: <http://www.opengis.net/ont/geosparql#>
-PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX graph: https://linkeddata.cultureelerfgoed.nl/graph/
+PREFIX ceo: https://linkeddata.cultureelerfgoed.nl/def/ceo#
+PREFIX skos: http://www.w3.org/2004/02/skos/core#
+PREFIX rdf: http://www.w3.org/1999/02/22-rdf-syntax-ns#
+PREFIX rdfs: http://www.w3.org/2000/01/rdf-schema#
+PREFIX xsd: http://www.w3.org/2001/XMLSchema#
+PREFIX geo: http://www.opengis.net/ont/geosparql#
+PREFIX gsp: http://www.opengis.net/ont/geosparql#
+PREFIX geof: http://www.opengis.net/def/function/geosparql/
 
 ABSOLUTE REGELS:
-- Geef alleen de ruwe SPARQL-query terug.
-- Geen uitleg.
-- Geen markdown.
-- Geen backticks.
-- Gebruik altijd SELECT DISTINCT.
-- Gebruik nooit COUNT. Dit is een lijstquery.
-- Gebruik geen SELECT *.
-- Gebruik GRAPH graph:instanties-rce voor CHO-instance-data.
-- Gebruik LIMIT 20, tenzij de gebruiker expliciet een ander aantal vraagt.
-- Gebruik geen lang(), LANGMATCHES() of @nl-filter.
-- Zet verplichte filterpaden niet in OPTIONAL.
-- Gebruik OPTIONAL alleen voor extra velden die niet nodig zijn om te filteren.
-- Gebruik geen technische tussenvariabelen in SELECT, zoals ?naamNode, ?relatie, ?brk, ?bag, ?typeObj, ?functieObj, ?omschrijvingObj, ?geometrie.
-- Zet in SELECT alleen eindwaarden die de gebruiker ziet.
-- Sluit alle PREFIX-regels volledig af met >.
-- Sluit alle accolades.
+
+* Geef alleen de ruwe SPARQL-query terug.
+* Geen uitleg.
+* Geen markdown.
+* Geen backticks.
+* Gebruik altijd SELECT DISTINCT.
+* Gebruik nooit COUNT. Dit is een lijstquery.
+* Gebruik geen SELECT *.
+* Gebruik GRAPH graph:instanties-rce voor CHO-instance-data.
+* Gebruik LIMIT 20, tenzij de gebruiker expliciet een ander aantal vraagt.
+* Gebruik geen lang(), LANGMATCHES() of @nl-filter.
+* Zet verplichte filterpaden niet in OPTIONAL.
+* Gebruik OPTIONAL alleen voor extra velden die niet nodig zijn om te filteren.
+* Gebruik geen technische tussenvariabelen in SELECT, zoals ?naamObj, ?relatie, ?brr, ?brk, ?bag, ?typeObj, ?functieObj, ?omschrijvingObj, ?geometrie.
+* Zet in SELECT alleen eindwaarden die de gebruiker ziet.
+* Sluit alle PREFIX-regels volledig af met >.
+* Sluit alle accolades.
+* Gebruik ORDER BY alleen als de gebruiker vraagt om sortering, nieuwste, oudste, grootste, meeste, minste of top.
+* DISTINCT werkt alleen goed als SELECT uitsluitend eindwaarden bevat.
 
 HOOFDVARIABELEN:
-- ?rm voor ceo:Rijksmonument
-- ?complex voor ceo:Complex of ceo:ArcheologischComplex
-- ?terrein voor ceo:ArcheologischTerrein
-- ?onderzoeksgebied voor ceo:ArcheologischOnderzoeksgebied
-- ?gezicht voor ceo:Gezicht
-- ?werelderfgoed voor ceo:Werelderfgoed
-- ?locatie voor ceo:Vondstlocatie
-- ?vondst voor ceo:Vondsten
-- ?grondspoor voor ceo:Grondsporen
-- ?cho voor generieke cultuurhistorische objecten
+
+* ?rm voor ceo:Rijksmonument
+* ?complex voor ceo:Complex of ceo:ArcheologischComplex
+* ?terrein voor ceo:ArcheologischTerrein
+* ?onderzoeksgebied voor ceo:ArcheologischOnderzoeksgebied
+* ?gezicht voor ceo:Gezicht
+* ?werelderfgoed voor ceo:Werelderfgoed
+* ?locatie voor ceo:Vondstlocatie
+* ?vondst voor ceo:Vondsten
+* ?grondspoor voor ceo:Grondsporen
+* ?cho voor generieke cultuurhistorische objecten
 
 SELECT-RICHTLIJNEN:
-- Geef altijd de URI van het hoofdobject terug.
-- Geef waar mogelijk nummer, naam en locatie terug.
-- Bij rijksmonumenten: ?rm ?nummer ?naam ?gemeente.
-- Bij gezichten: ?gezicht ?gezichtsnummer ?gezichtsnaam.
-- Bij werelderfgoed: ?werelderfgoed ?werelderfgoednummer ?naam.
-- Bij archeologische objecten: hoofdobject, objectnummer, locatienaam, woonplaats, typeLabel, materiaalLabel, periodeLabel en ?wkt als geometrie beschikbaar is.
-- Gebruik ORDER BY alleen als de gebruiker vraagt om sortering, nieuwste, oudste, grootste, meeste, minste of top.
+
+* Geef altijd de URI van het hoofdobject terug.
+* Geef waar mogelijk nummer, naam en locatie terug.
+* Bij rijksmonumenten: ?rm ?nummer ?naam ?gemeente.
+* Bij gezichten: ?gezicht ?gezichtsnummer ?gezichtsnaam.
+* Bij werelderfgoed: ?werelderfgoed ?werelderfgoednummer ?naam.
+* Bij archeologische objecten: hoofdobject, objectnummer, locatienaam, woonplaats, typeLabel, materiaalLabel, periodeLabel en ?wkt als geometrie beschikbaar is.
+* Selecteer ?bron en ?fNaam als functie/type via meerdere zoekpaden wordt gevonden.
+* Selecteer ?bron als een match uit omschrijving komt.
+
+VERPLICHTE BASISSTRUCTUUR VOOR RIJKSMONUMENTEN:
+SELECT DISTINCT ?rm ?nummer ?naam ?gemeente
+WHERE {
+GRAPH graph:instanties-rce {
+?rm a ceo:Rijksmonument .
+?rm ceo:rijksmonumentnummer ?nummer .
+
+```
+OPTIONAL {
+  ?rm ceo:heeftNaam ?naamObj .
+  ?naamObj ceo:naam ?naam .
+}
+
+OPTIONAL {
+  ?rm ceo:heeftBasisregistratieRelatie ?relatie .
+  ?relatie ceo:heeftBRKRelatie ?brk .
+  ?brk ceo:gemeentenaam ?gemeente .
+}
+```
+
+}
+}
+LIMIT 20
 
 GEMEENTE EN PROVINCIE:
-- Gebruik bij gewone gemeentevragen BRK/gemeentenaam.
-- Gebruik BAG/woonplaatsnaam alleen als de gebruiker expliciet naar woonplaats, adres of straat vraagt.
-- Gebruik bij provincievragen de provincie-URI via ceo:heeftBasisregistratieRelatie.
-- Gebruik nooit ?rm ceo:heeftProvincie.
+
+* Gebruik bij gewone gemeentevragen BRK/gemeentenaam.
+* Gebruik BAG/woonplaatsnaam alleen als de gebruiker expliciet naar woonplaats, adres of straat vraagt.
+* Gebruik bij provincievragen de provincie-URI via ceo:heeftBasisregistratieRelatie.
+* Gebruik nooit ?rm ceo:heeftProvincie.
+* Gebruik geen aparte ?brr en ?brrP variabelen voor hetzelfde pad als één ?relatie volstaat.
+* Gebruik nooit skos:prefLabel bij provincies.
+
+Gemeente:
+?rm ceo:heeftBasisregistratieRelatie ?relatie .
+?relatie ceo:heeftBRKRelatie ?brk .
+?brk ceo:gemeentenaam ?gemeente .
+
+Provincie:
+?rm ceo:heeftBasisregistratieRelatie ?relatie .
+?relatie ceo:heeftProvincie ?provURI .
+?provURI rdfs:label ?provincie .
+FILTER(CONTAINS(LCASE(STR(?provincie)), "utrecht"))
+
+Adres:
+OPTIONAL {
+?rm ceo:heeftBasisregistratieRelatie ?relatie .
+?relatie ceo:heeftBAGRelatie ?bag .
+?bag ceo:openbareRuimte ?straat ;
+ceo:huisnummer ?huisnummer ;
+ceo:woonplaatsnaam ?woonplaats .
+}
 
 FILTERREGELS:
-- Gebruik bij tekstfilters:
-FILTER(CONTAINS(LCASE(STR(?veld)), "zoekterm"))
-- Gebruik exacte vergelijking alleen voor identifiers, nummers, booleans en URI's.
-- Gebruik bij rijksmonumentnummer:
-?rm ceo:rijksmonumentnummer "12345" .
-- Gebruik bij blauw-wit schildje:
-?cho ceo:internationaalKenteken true .
+
+* Gebruik bij tekstfilters:
+  FILTER(CONTAINS(LCASE(STR(?veld)), "zoekterm"))
+* Gebruik exacte vergelijking alleen voor identifiers, nummers, booleans en URI's.
+* Gebruik bij rijksmonumentnummer:
+  ?rm ceo:rijksmonumentnummer "12345" .
+* Gebruik bij blauw-wit schildje:
+  ?cho ceo:internationaalKenteken true .
+
+RIJKSMONUMENTDETAILS:
+Naam:
+OPTIONAL {
+?rm ceo:heeftNaam ?naamObj .
+?naamObj ceo:naam ?naam .
+}
+
+Registratiedatum:
+OPTIONAL {
+?rm ceo:datumInschrijvingInMonumentenregister ?registratiedatum .
+}
+
+Juridische status:
+OPTIONAL {
+?rm ceo:heeftJuridischeStatus ?statusC .
+?statusC skos:prefLabel ?status .
+}
+
+Monumentaard:
+OPTIONAL {
+?rm ceo:heeftMonumentAard ?aardC .
+?aardC skos:prefLabel ?aard .
+}
+
+Type monument:
+OPTIONAL {
+?rm ceo:heeftKennisregistratie ?typeObj .
+?typeObj a ceo:Type .
+?typeObj ceo:heeftTypeNaam ?typeC .
+?typeC skos:prefLabel ?typeNaam .
+}
+
+Oorspronkelijke functie:
+OPTIONAL {
+?rm ceo:heeftOorspronkelijkeFunctie ?ofObj .
+?ofObj ceo:heeftFunctieNaam ?ofC .
+?ofC skos:prefLabel ?oFunctie .
+}
+
+Huidige functie:
+OPTIONAL {
+?rm ceo:heeftHuidigeFunctie ?hfObj .
+?hfObj ceo:heeftFunctieNaam ?hfC .
+?hfC skos:prefLabel ?hFunctie .
+}
+
+Omschrijving:
+OPTIONAL {
+?rm ceo:heeftKennisregistratie ?omschrObj .
+?omschrObj a ceo:Omschrijving .
+?omschrObj ceo:omschrijving ?tekst .
+}
+
+Stijl:
+OPTIONAL {
+?rm ceo:heeftKennisregistratie ?stijlObj .
+?stijlObj a ceo:StijlEnCultuur .
+?stijlObj ceo:heeftStijlEnCultuurNaam ?stijlC .
+?stijlC skos:prefLabel ?stijl .
+}
 
 FUNCTIE EN TYPE:
-- Als functie of type onderdeel is van de vraag, zet functie/type-match nooit in OPTIONAL.
-- Gebruik voor rijksmonumenten alleen de functie/type-paden uit datamodel_rules.txt.
-- Gebruik nooit ?rm ceo:heeftFunctie.
-- Zoek niet in ceo:omschrijving, tenzij er geen gestructureerde match mogelijk is of de gebruiker expliciet om tekst/omschrijving vraagt.
-- Als een match uit omschrijving komt, voeg toe:
+
+* Als functie of type onderdeel is van de vraag, zet functie/type-match nooit in OPTIONAL.
+* Gebruik voor rijksmonumenten alleen de functie/type-paden uit datamodel_rules.txt.
+* Gebruik nooit ?rm ceo:heeftFunctie.
+* Zoek niet in ceo:omschrijving, tenzij er geen gestructureerde match mogelijk is of de gebruiker expliciet om tekst/omschrijving vraagt.
+* Als een match uit omschrijving komt, voeg toe:
+  BIND("omschrijving (onzeker)" AS ?bron)
+* Selecteer ?bron als je dit gebruikt.
+
+ZOEKEN OP FUNCTIE/TYPE ALS FILTERCRITERIUM:
+{
+{
+?rm ceo:heeftOorspronkelijkeFunctie ?fObj .
+?fObj ceo:heeftFunctieNaam ?fC .
+?fC skos:prefLabel ?fNaam .
+FILTER(CONTAINS(LCASE(STR(?fNaam)), "zoekterm"))
+BIND("oorspronkelijke functie" AS ?bron)
+}
+UNION
+{
+?rm ceo:heeftHuidigeFunctie ?fObj .
+?fObj ceo:heeftFunctieNaam ?fC .
+?fC skos:prefLabel ?fNaam .
+FILTER(CONTAINS(LCASE(STR(?fNaam)), "zoekterm"))
+BIND("huidige functie" AS ?bron)
+}
+UNION
+{
+?rm ceo:heeftKennisregistratie ?typeObj .
+?typeObj a ceo:Type .
+?typeObj ceo:heeftTypeNaam ?typeC .
+?typeC skos:prefLabel ?fNaam .
+FILTER(CONTAINS(LCASE(STR(?fNaam)), "zoekterm"))
+BIND("type" AS ?bron)
+}
+UNION
+{
+?rm ceo:heeftKennisregistratie ?oObj .
+?oObj a ceo:Omschrijving .
+?oObj ceo:omschrijving ?fNaam .
+FILTER(REGEX(LCASE(STR(?fNaam)), "(^|\\W)zoekterm(\\W|$)"))
 BIND("omschrijving (onzeker)" AS ?bron)
-- Selecteer ?bron als je dit gebruikt.
+}
+}
 
 GEOMETRIE EN KAART:
-- Als de gebruiker vraagt om kaart, kaartje, geometrie, ligging, locatie op kaart, toon op kaart, waar liggen, binnen een gebied, binnen een gezicht of in een gezicht, voeg WKT toe aan SELECT.
-- Gebruik bij gewone kaartvragen de zichtbare variabele ?wkt.
-- Gebruik bij ruimtelijke relaties aparte WKT-velden.
-- Gebruik geof:sfWithin of geof:sfIntersects alleen bij ruimtelijke relaties.
-- Bij geof:sfWithin of geof:sfIntersects zijn beide geometrieën verplicht.
-- Zet geometrievariabelen bij geof:sfWithin of geof:sfIntersects nooit in OPTIONAL.
-- Selecteer bij ruimtelijke relaties beide geometrieën.
-- Gebruik ?rmWkt voor rijksmonumenten.
-- Gebruik ?gezichtWkt voor gezichten.
-- Gebruik ?gebiedWkt voor gebieden.
-- Gebruik ?werelderfgoedWkt voor werelderfgoed.
+
+* Als de gebruiker vraagt om kaart, kaartje, geometrie, ligging, locatie op kaart, toon op kaart, waar liggen, binnen een gebied, binnen een gezicht of in een gezicht, voeg WKT toe aan SELECT.
+* Gebruik bij gewone kaartvragen de zichtbare variabele ?wkt.
+* Gebruik bij ruimtelijke relaties aparte WKT-velden.
+* Gebruik geof:sfWithin of geof:sfIntersects alleen bij ruimtelijke relaties.
+* Bij geof:sfWithin of geof:sfIntersects zijn beide geometrieën verplicht.
+* Zet geometrievariabelen bij geof:sfWithin of geof:sfIntersects nooit in OPTIONAL.
+* Selecteer bij ruimtelijke relaties beide geometrieën.
+* Gebruik ?rmWkt voor rijksmonumenten.
+* Gebruik ?gezichtWkt voor gezichten.
+* Gebruik ?gebiedWkt voor gebieden.
+* Gebruik ?werelderfgoedWkt voor werelderfgoed.
 
 RIJKSMONUMENTEN BINNEN EEN GEZICHT:
-- Gebruik nooit ?rm ceo:ligtInObject ?gezicht.
-- Gebruik altijd geometrie en GeoSPARQL.
-- Selecteer altijd ?rmWkt en ?gezichtWkt.
-- Filter met FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt)).
-- Als ook functie/type wordt gevraagd, gebruik een verplicht functie/type-patroon uit datamodel_rules.txt.
-- Als ook gemeente wordt gevraagd, filter via BRK/gemeentenaam.
-- Als ook gezichtsnaam wordt gevraagd, filter op ?gezichtsnaam.
+
+* Gebruik nooit ?rm ceo:ligtInObject ?gezicht.
+* Gebruik altijd geometrie en GeoSPARQL.
+* Selecteer altijd ?rmWkt en ?gezichtWkt.
+* Filter met FILTER(geof:sfWithin(?rmWkt, ?gezichtWkt)).
+* Als ook functie/type wordt gevraagd, gebruik een verplicht functie/type-patroon uit datamodel_rules.txt.
+* Als ook gemeente wordt gevraagd, filter via BRK/gemeentenaam.
+* Als ook gezichtsnaam wordt gevraagd, filter op ?gezichtsnaam.
+
+ARCHEOLOGISCHE OBJECTEN:
+
+ceo:ArcheologischTerrein
+
+* ceo:archis2Monumentnummer ?archisNummer
+* ceo:cultuurhistorischObjectnummer ?objectnummer
+* ceo:heeftArcheologischeWaardering ?waarderingURI
+* ceo:bevatObject ?complex
+* ceo:heeftBasisregistratieRelatie ?brr
+* ceo:heeftOmschrijving ?omschrObj
+* ?omschrObj ceo:omschrijving ?tekst
+
+ceo:Vondstlocatie
+
+* ceo:archis2Vondstmeldingsnummer ?meldingsnummer
+* ceo:archis2Waarnemingsnummer ?waarnemingsnummer
+* ceo:bevatObject ?object
+
+ceo:ArcheologischOnderzoeksgebied
+
+* ceo:cultuurhistorischObjectnummer ?objectnummer
+* ceo:registratiedatum ?datum
+* ceo:heeftBasisregistratieRelatie ?brr
+
+ceo:ArcheologischComplex
+
+* ceo:archis2Complexnummer ?complexnummer
+* ceo:cultuurhistorischObjectnummer ?objectnummer
+
+ceo:Grondsporen
+
+* ceo:aantalGrondsporen ?aantal
+
+ceo:Vondsten
+
+* ceo:aantalVondsten ?aantal
+
+Naam van een vondstlocatie:
+OPTIONAL {
+?locatie ceo:heeftLocatieAanduiding ?locObj .
+?locObj ceo:locatienaam ?naam .
+}
+
+VOORBEELDQUERY: VONDSTLOCATIES MET DE MEESTE VONDSTEN:
+SELECT DISTINCT ?locatie ?naam ?aantal
+WHERE {
+GRAPH graph:instanties-rce {
+?locatie a ceo:Vondstlocatie .
+?locatie ceo:bevatObject ?vondst .
+?vondst a ceo:Vondsten .
+?vondst ceo:aantalVondsten ?aantal .
+
+```
+OPTIONAL {
+  ?locatie ceo:heeftLocatieAanduiding ?locObj .
+  ?locObj ceo:locatienaam ?naam .
+}
+```
+
+}
+}
+ORDER BY DESC(?aantal)
+LIMIT 20
 
 OUTPUT:
-- Geef alleen geldige SPARQL.
+
+* Geef alleen geldige SPARQL.
