@@ -71,7 +71,7 @@ Gebruik ceo:cultuurhistorischObjectnummer alleen als de gebruiker expliciet vraa
 - cultuurhistorisch object
 
 VERPLICHTE BASISSTRUCTUUR VOOR RIJKSMONUMENTEN:
-SELECT DISTINCT ?rm ?nummer ?naam ?gemeente
+SELECT DISTINCT ?rm ?nummer ?naam ?gemeente ?wkt
 WHERE {
   GRAPH graph:instanties-rce {
     ?rm a ceo:Rijksmonument .
@@ -86,6 +86,10 @@ WHERE {
       ?rm ceo:heeftBasisregistratieRelatie ?relatie .
       ?relatie ceo:heeftBRKRelatie ?brk .
       ?brk ceo:gemeentenaam ?gemeente .
+    }
+
+    OPTIONAL {
+      ?rm ceo:heeftGeometrie/gsp:asWKT ?wkt .
     }
   }
 }
@@ -259,7 +263,15 @@ WHERE {
 LIMIT 20
 
 GEOMETRIE EN KAART:
-- Als de gebruiker vraagt om kaart, kaartje, geometrie, ligging, locatie op kaart, toon op kaart, waar liggen, binnen een gebied, binnen een gezicht of in een gezicht, voeg WKT toe aan SELECT.
+- Neem bij rijksmonument-lijstvragen standaard ?wkt op in SELECT en voeg geometrie optioneel toe.
+
+Gebruik:
+
+OPTIONAL {
+  ?rm ceo:heeftGeometrie/gsp:asWKT ?wkt .
+}
+
+Alleen als de gebruiker expliciet géén kaart of geometrie wil, mag ?wkt ontbreken.
 - Gebruik bij gewone kaartvragen de zichtbare variabele ?wkt.
 - Gebruik bij ruimtelijke relaties aparte WKT-velden.
 - Gebruik geof:sfWithin of geof:sfIntersects alleen bij ruimtelijke relaties.
