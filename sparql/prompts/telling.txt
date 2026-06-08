@@ -144,6 +144,9 @@ Provincie:
 ?rm ceo:heeftBasisregistratieRelatie ?relatie .
 ?relatie ceo:heeftProvincie <PROVINCIE_URI> .
 
+Gebruik voor Utrecht altijd:
+<http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)>
+
 Gebruik nooit:
 ?rm ceo:heeftProvincie ?provincie .
 
