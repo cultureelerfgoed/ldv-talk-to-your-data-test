@@ -124,12 +124,26 @@ GEMEENTE EN PROVINCIE:
 - Gebruik geen aparte ?brr en ?brrP variabelen voor hetzelfde pad als één ?relatie volstaat.
 - Gebruik nooit skos:prefLabel bij provincies.
 
-Gemeente:
-Gemeente als filtercriterium:
+GEMEENTEN PRECIES FILTEREN
+
+Als de gebruiker vraagt naar een gemeente, gebruik BRK/gemeentenaam en filter exact.
+
+Gebruik:
+
 ?rm ceo:heeftBasisregistratieRelatie ?relatie .
 ?relatie ceo:heeftBRKRelatie ?brk .
 ?brk ceo:gemeentenaam ?gemeente .
+FILTER(LCASE(STR(?gemeente)) = "zeist")
+
+Gebruik bij gemeenten niet standaard CONTAINS, behalve als de gebruiker expliciet vraagt om gedeeltelijke naamzoekactie.
+
+Fout:
+
 FILTER(CONTAINS(LCASE(STR(?gemeente)), "zeist"))
+
+Goed:
+
+FILTER(LCASE(STR(?gemeente)) = "zeist")
 ?rm ceo:heeftBasisregistratieRelatie ?relatie .
 ?relatie ceo:heeftBRKRelatie ?brk .
 ?brk ceo:gemeentenaam ?gemeente .

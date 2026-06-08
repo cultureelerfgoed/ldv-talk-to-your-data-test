@@ -108,7 +108,7 @@ Gemeente:
 ?rm ceo:heeftBasisregistratieRelatie ?relatie .
 ?relatie ceo:heeftBRKRelatie ?brk .
 ?brk ceo:gemeentenaam ?gemeente .
-FILTER(CONTAINS(LCASE(STR(?gemeente)), "bunnik"))
+FILTER(LCASE(STR(?gemeente)) = "zeist")
 
 Gebruik BAG/woonplaatsnaam alleen als de gebruiker expliciet naar woonplaats, adres of straat vraagt.
 

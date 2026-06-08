@@ -150,6 +150,7 @@ Gemeente loopt via BRKRelatie:
 ?relatie ceo:heeftBRKRelatie ?brk .
 ?brk ceo:gemeentenaam ?gemeente .
 
+
 Voor gewone gemeentevragen gebruik je BRK/gemeentenaam, niet BAG/woonplaatsnaam.
 
 Adres en woonplaats lopen via BAGRelatie:
