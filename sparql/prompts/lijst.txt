@@ -110,7 +110,7 @@ WHERE {
     }
 
     OPTIONAL {
-      ?rm ceo:heeftGeometrie/gsp:asWKT ?wkt .
+      ?rm ceo:heeftGeometrie/geo:asWKT ?wkt .
     }
   }
 }

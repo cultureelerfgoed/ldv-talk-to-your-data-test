@@ -14,8 +14,8 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
 # Ollama
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:14b")
-OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "12000"))
-OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "1800"))
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
+OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "900"))
 
 def _require(key: str) -> str:
     value = os.getenv(key)
@@ -46,7 +46,6 @@ PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX gsp: <http://www.opengis.net/ont/geosparql#>
 PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>"""
 
@@ -97,4 +96,7 @@ PROVINCIE_URI = {
     "zuid holland":         _BASE + "Zuid-Holland",
     "zuidholland":          _BASE + "Zuid-Holland",
     "z-holland":            _BASE + "Zuid-Holland",
+    "nederlandse provincie utrecht": _BASE + "Utrecht_(provincie)",
+    "provincie friesland": _BASE + "Fryslan",
+    "provincie fryslân": _BASE + "Fryslan",
 }

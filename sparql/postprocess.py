@@ -26,7 +26,6 @@ REQUIRED_PREFIXES = {
     "rdfs:": "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
     "xsd:": "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>",
     "geo:": "PREFIX geo: <http://www.opengis.net/ont/geosparql#>",
-    "gsp:": "PREFIX gsp: <http://www.opengis.net/ont/geosparql#>",
     "geof:": "PREFIX geof: <http://www.opengis.net/def/function/geosparql/>",
 }
 
