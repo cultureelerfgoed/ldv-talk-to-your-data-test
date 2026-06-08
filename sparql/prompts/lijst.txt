@@ -268,7 +268,7 @@ GEOMETRIE EN KAART:
 Gebruik:
 
 OPTIONAL {
-  ?rm ceo:heeftGeometrie/gsp:asWKT ?wkt .
+  ?rm ceo:heeftGeometrie/geo:asWKT ?wkt .
 }
 
 Alleen als de gebruiker expliciet géén kaart of geometrie wil, mag ?wkt ontbreken.
