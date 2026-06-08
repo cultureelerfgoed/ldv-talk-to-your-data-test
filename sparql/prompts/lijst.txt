@@ -492,5 +492,32 @@ WHERE {
 ORDER BY DESC(?aantal)
 LIMIT 20
 
+Bij vragen naar Romeinse vondsten mag datering NIET in OPTIONAL staan.
+De periode is dan een verplicht filtercriterium.
+
+Gebruik:
+
+?vondst ceo:heeftGebeurtenis ?gebeurtenis .
+?gebeurtenis ceo:heeftDatering ?datering .
+
+{
+  ?datering ceo:heeftBeginDatering ?begin .
+  ?begin ceo:heeftPeriode ?periode .
+  ?periode skos:prefLabel ?periodeLabel .
+}
+UNION
+{
+  ?datering ceo:heeftEindDatering ?eind .
+  ?eind ceo:heeftPeriode ?periode .
+  ?periode skos:prefLabel ?periodeLabel .
+}
+
+FILTER(CONTAINS(LCASE(STR(?periodeLabel)), "romeins"))
+
+Selecteer altijd ?periodeLabel.
+
+ceo:heeftPeriode ?periode .
+?periode skos:prefLabel ?periodeLabel .
+
 OUTPUT:
 - Geef alleen geldige SPARQL.
