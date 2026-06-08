@@ -33,6 +33,27 @@ ABSOLUTE REGELS:
 - Gebruik ORDER BY alleen als de gebruiker vraagt om sortering, nieuwste, oudste, grootste, meeste, minste of top.
 - DISTINCT werkt alleen goed als SELECT uitsluitend eindwaarden bevat.
 
+FILTERREGELS:
+
+- Plaats FILTER altijd binnen dezelfde WHERE-block waar de variabele bestaat.
+- Plaats FILTER binnen dezelfde GRAPH-block waar de variabele wordt gemaakt.
+- Zet FILTER nooit buiten WHERE.
+- Zet FILTER nooit na een afsluitende } van WHERE.
+- Zet FILTER direct na het patroon waarop gefilterd wordt.
+
+Goed:
+
+?rm ceo:heeftBasisregistratieRelatie ?relatie .
+?relatie ceo:heeftBRKRelatie ?brk .
+?brk ceo:gemeentenaam ?gemeente .
+
+FILTER(CONTAINS(LCASE(STR(?gemeente)), "zeist"))
+
+Fout:
+
+}
+FILTER(CONTAINS(LCASE(STR(?gemeente)), "zeist"))
+
 HOOFDVARIABELEN:
 - ?rm voor ceo:Rijksmonument
 - ?complex voor ceo:Complex of ceo:ArcheologischComplex
@@ -104,6 +125,11 @@ GEMEENTE EN PROVINCIE:
 - Gebruik nooit skos:prefLabel bij provincies.
 
 Gemeente:
+Gemeente als filtercriterium:
+?rm ceo:heeftBasisregistratieRelatie ?relatie .
+?relatie ceo:heeftBRKRelatie ?brk .
+?brk ceo:gemeentenaam ?gemeente .
+FILTER(CONTAINS(LCASE(STR(?gemeente)), "zeist"))
 ?rm ceo:heeftBasisregistratieRelatie ?relatie .
 ?relatie ceo:heeftBRKRelatie ?brk .
 ?brk ceo:gemeentenaam ?gemeente .
@@ -313,6 +339,8 @@ WHERE {
 
     OPTIONAL {
       ?rm ceo:heeftNaam/ceo:naam ?naam .
+
+    FILTER(CONTAINS(LCASE(STR(?gezichtsnaam)), "dordrecht"))
     }
 
     FILTER(CONTAINS(LCASE(STR(?gezichtsnaam)), "dordrecht"))
