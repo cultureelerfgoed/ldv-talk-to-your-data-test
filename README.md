@@ -22,10 +22,11 @@ De applicatie is geoptimaliseerd voor de Cultureel Erfgoed Ontologie (CEO) en be
 - Voer SPARQL direct uit op het RCE endpoint
 - Krijg een leesbaar Nederlands antwoord
 - Exporteer resultaten als CSV
-- Interactieve kaartweergave via Leaflet
+- Interactieve kaartweergave via Leaflet met marker clustering
 - Automatische herkenning van WKT-geometrie
 - Ondersteuning voor ruimtelijke queries (geof:sfWithin, geof:sfIntersects)
 - Automatische detectie van lijst- of tellingvragen
+- Waarschuwing bij bereiken van Virtuoso maximumlimiet (10.000 rijen)
 
 Ondersteunde objecttypen:
 
@@ -72,6 +73,7 @@ Ondersteunde objecttypen:
 - Welke grondsporen horen bij een vondstlocatie?
 - Toon archeologische terreinen op de kaart
 - Welke Romeinse vondsten liggen in Nuth?
+
 ---
 
 # Architectuur
@@ -115,7 +117,7 @@ requirements.txt             — Python dependencies
 ## Repository clonen
 
 ```powershell
-git clone https://github.com/jolietjakeblues/ldv-talk-to-your-data-test.git
+git clone https://github.com/cultureelerfgoed/ldv-talk-to-your-data-test.git
 cd ldv-talk-to-your-data-test
 ```
 
@@ -203,25 +205,101 @@ http://127.0.0.1:5000
 
 ---
 
-# Datamodelregels
+# Postprocessing
 
-De applicatie gebruikt een centrale kennisbasis in:
+Na het genereren van een SPARQL query past `postprocess.py` automatisch een reeks correcties toe voordat de query naar het endpoint wordt gestuurd. Dit compenseert voor veelvoorkomende fouten die LLMs maken bij het bevragen van de CEO-ontologie.
 
-sparql/prompts/datamodel_rules.txt
+## Stappen in volgorde
 
-Dit bestand bevat:
+### 1. Prefix injectie
 
-- CEO classes
-- property paths
-- archeologische patronen
-- geometrische relaties
-- BAG/BRK-structuren
-- gezichten
-- werelderfgoed
-- ActorEnRol patronen
-- functie- en typepaden
+Ontbrekende standaardprefixen worden automatisch toegevoegd als ze in de query worden gebruikt maar niet gedeclareerd zijn:
 
-lijst.txt en telling.txt bevatten alleen gedragsregels voor respectievelijk lijst- en tellingqueries.
+```sparql
+PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+```
+
+### 2. Gezicht URI normalisatie
+
+Bij vragen over beschermde gezichten (stads- en dorpsgezichten) wordt de naam automatisch opgezocht in een dynamisch geladen mapping van alle gezichten in de dataset. De string-gebaseerde FILTER wordt vervangen door een directe URI-vergelijking.
+
+Van:
+```sparql
+FILTER(CONTAINS(LCASE(?naam), "deventer"))
+```
+
+Naar:
+```sparql
+FILTER(?gezicht = <https://linkeddata.cultureelerfgoed.nl/cho-kennis/id/gezicht/10134270>)
+```
+
+Als meerdere gezichten de zoekterm bevatten (bijv. "amsterdam"), worden alle overeenkomende URIs opgenomen via `FILTER(?gezicht IN (...))`.
+
+### 3. Gemeente URI normalisatie
+
+Gemeentenamen worden opgezocht in een dynamisch geladen mapping van alle gemeenten uit de dataset, inclusief alle alternatieve namen. De string-gebaseerde FILTER via `ceo:gemeentenaam` wordt vervangen door een directe `ceo:heeftGemeente` vergelijking met de OWMS URI.
+
+Dit voorkomt ambiguïteit bij gemeenten met meerdere namen, zoals:
+
+| Invoer | URI |
+|---|---|
+| `den bosch` | `owms:terms/'s-Hertogenbosch_(gemeente)` |
+| `den haag` | `owms:terms/'s-Gravenhage_(gemeente)` |
+| `ferwerderadiel` | `owms:terms/Ferwerderadeel_(gemeente)` |
+
+De mapping wordt bij elke herstart van de applicatie automatisch opgehaald uit het SPARQL endpoint.
+
+### 4. Provincie URI normalisatie
+
+Provincienamen worden genormaliseerd naar OWMS URIs via een hardgecodeerde mapping die alle gangbare spelwijzen afdekt:
+
+| Invoer | URI |
+|---|---|
+| `friesland` | `owms:terms/Fryslan` |
+| `fryslân` | `owms:terms/Fryslan` |
+| `utrecht` | `owms:terms/Utrecht_(provincie)` |
+| `noord-holland` | `owms:terms/Noord-Holland` |
+
+De rdfs:label stap en FILTER worden verwijderd. De provincie-URI wordt direct in de query opgenomen.
+
+### 5. Provincie pad correctie
+
+Als het LLM `ceo:heeftProvincie` gebruikt zonder de verplichte `rdfs:label` stap, wordt het pad automatisch aangevuld.
+
+### 6. Label filter correctie
+
+`FILTER(LCASE(?x) = "waarde")` werkt niet betrouwbaar voor taalgelabelde strings. Dit wordt automatisch vervangen door `FILTER(CONTAINS(LCASE(?x), "waarde"))`.
+
+### 7. Gezicht WKT toevoeging
+
+Bij ruimtelijke queries met `geof:sfWithin` op een gezicht wordt `?gezichtWkt` automatisch toegevoegd aan de SELECT als die ontbreekt. Zo wordt het gezichtspolygoon altijd op de kaart getoond naast de gevonden monumenten.
+
+### 8. LIMIT instelling
+
+Voor lijstqueries wordt de LIMIT altijd ingesteld op 10.000 (het Virtuoso maximum). Lagere LIMITs die het LLM genereert worden automatisch vervangen. Tellingqueries krijgen geen LIMIT.
+
+### 9. LIMIT waarschuwing
+
+Als het aantal teruggegeven rijen gelijk is aan de ingestelde LIMIT, wordt een waarschuwing toegevoegd aan de response. De frontend toont deze als gele balk boven de resultaten.
+
+### 10. Deduplicatie
+
+Als `?rm` aanwezig is in de resultaten, wordt op die variabele gededupliceerd. Meerdere kadastrale percelen of naam-instanties per monument geven anders dubbele rijen.
+
+---
+
+# Dynamische mappings
+
+Bij het opstarten van de applicatie worden twee mappings automatisch geladen uit het SPARQL endpoint:
+
+**Gemeentemapping** — alle gemeente-URIs met bijbehorende labels (inclusief alternatieve namen zoals "Den Bosch" en "'s-Hertogenbosch"). Wordt opgeslagen in `config.GEMEENTE_URI`.
+
+**Gezichtmapping** — alle gezicht-URIs met bijbehorende namen. Bij meerdere gezichten met dezelfde naam worden alle URIs opgeslagen. Wordt opgeslagen in `config.GEZICHT_URI`.
+
+Deze mappings zorgen ervoor dat de applicatie altijd up-to-date is met de actuele data, zonder handmatige aanpassingen bij gemeentelijke herindelingen of nieuwe gezichten.
 
 ---
 
@@ -236,25 +314,49 @@ Wanneer een query WKT-geometrie teruggeeft, toont de frontend automatisch:
 - polygonen
 - multipolygonen
 
+Markers worden automatisch geclusterd bij uitzoomen via Leaflet.markercluster. Polygonen (zoals beschermde gezichten) worden als vlakken getoond in een aparte laag zonder clustering.
+
 Ondersteunde WKT-velden:
 
-- ?wkt
-- ?rmWkt
-- ?gezichtWkt
-- ?gebiedWkt
+- `?wkt`
+- `?rmWkt`
+- `?gezichtWkt`
+- `?gebiedWkt`
 
-Bij ruimtelijke queries kunnen meerdere geometrieën tegelijk worden weergegeven, bijvoorbeeld:
+Bij ruimtelijke queries kunnen meerdere geometrieën tegelijk worden weergegeven, bijvoorbeeld een beschermd gezicht als vlak met rijksmonumenten als geclusterde punten.
 
-- beschermd gezicht als vlak
-- rijksmonumenten als punten
+---
+
+# Datamodelregels
+
+De applicatie gebruikt een centrale kennisbasis in:
+
+```
+sparql/prompts/datamodel_rules.txt
+```
+
+Dit bestand bevat:
+
+- CEO klassen en property paths
+- archeologische patronen
+- geometrische relaties
+- BAG/BRK-structuren
+- gezichten en werelderfgoed
+- ActorEnRol patronen
+- functie- en typepaden
+
+`lijst.txt` en `telling.txt` bevatten alleen gedragsregels voor respectievelijk lijst- en tellingqueries.
+
+---
 
 # Bekende beperkingen
 
 - Grote geometrische queries kunnen timeouts veroorzaken
-- Ruimtelijke queries via geof:sfWithin kunnen traag zijn
+- Ruimtelijke queries via `geof:sfWithin` zijn zwaar — de postprocessor vereist altijd een voorfilter op gemeente of gezicht
 - Sommige geometrieën ontbreken in de brondata
 - Sommige objecttypen gebruiken inconsistente CEO-structuren
 - Grote prompts kunnen bij kleinere LLM's incomplete SPARQL opleveren
+- De Virtuoso limiet van 10.000 rijen kan niet worden overschreden — bij grote resultaatsets verschijnt een waarschuwing
 
 ---
 
