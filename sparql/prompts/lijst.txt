@@ -16,8 +16,8 @@ SELECT DISTINCT ?rm ?nummer ?naam ?wkt ?gezichtWkt WHERE {
 
 
 VERPLICHTE VOLGORDE bij ruimtelijke queries:
-1. Filter eerst op gemeente of provincie (kleine subset via URI)
-2. Dan pas geof:sfWithin op die subset
+1. Als je filtert op een GEZICHT: gebruik het gezichtspolygoon als enige filter — voeg GEEN gemeente of provincie filter toe
+2. Als je filtert op een willekeurig gebied ZONDER gezicht: filter eerst op gemeente of provincie, dan pas geof:sfWithin
 
 Goed — eerst gemeente filter, dan ruimtelijk:
 ?rm a ceo:Rijksmonument .
