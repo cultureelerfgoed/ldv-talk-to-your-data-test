@@ -111,10 +111,13 @@ def health():
     except EnvironmentError:
         api_key_set = False
 
+    model = config.GOOGLE_MODEL if config.LLM_PROVIDER == "google" else config.ANTHROPIC_MODEL
+
     return jsonify({
         "status": "ok",
         "api_key_set": api_key_set,
-        "model": config.ANTHROPIC_MODEL,
+        "provider": config.LLM_PROVIDER,
+        "model": model,
         "endpoint": config.SPARQL_ENDPOINT,
     })
 
