@@ -250,6 +250,45 @@ def normalize_provincie_uri(query: str) -> str:
     return query
 
 
+def add_gezicht_wkt(query: str) -> str:
+    """
+    Als de query sfWithin gebruikt met een gezichtgeometrie maar ?gezichtWkt
+    niet in de SELECT staat, voeg die dan automatisch toe.
+    Zo wordt het gezichtspolygoon altijd op de kaart getoond.
+    """
+    if "sfWithin" not in query:
+        return query
+    if "gezichtWkt" in query and "SELECT" in query:
+        # Check of gezichtWkt al in SELECT staat
+        select_match = re.search(r'SELECT.*?WHERE', query, re.IGNORECASE | re.DOTALL)
+        if select_match and "gezichtWkt" in select_match.group(0):
+            return query
+    # Voeg ?gezichtWkt toe aan SELECT en aan WHERE als die er al in zit
+    if "gezichtWkt" not in query:
+        # Voeg toe aan WHERE: haal WKT op van het gezicht
+        query = re.sub(
+            r'(\?gezichtGeom\s+\w+:asWKT\s+\?gezichtWkt\s*\.)',
+            r'',
+            query
+        )
+        # Als gezichtGeom wel bestaat maar gezichtWkt niet
+        query = re.sub(
+            r'(\?\w+Geom\s+(?:geo|gsp):asWKT\s+\?\w+Wkt\s*\.)',
+            r'',
+            query
+        )
+    # Voeg ?gezichtWkt toe aan SELECT als die er nog niet in zit
+    if "gezichtWkt" in query and not re.search(r'SELECT[^{]*gezichtWkt', query, re.IGNORECASE | re.DOTALL):
+        query = re.sub(
+            r'(SELECT\s+(?:DISTINCT\s+)?)',
+            r'?gezichtWkt ',
+            query,
+            count=1,
+            flags=re.IGNORECASE
+        )
+    return query
+
+
 def fix_label_filter(query: str) -> str:
     """
     Vervang FILTER(LCASE(?x) = "waarde") door FILTER(CONTAINS(LCASE(?x), "waarde")).
@@ -295,6 +334,7 @@ def postprocess(query: str, mode: str) -> str:
     query = normalize_gemeente_uri(query)
     query = fix_provincie_pad(query)
     query = normalize_provincie_uri(query)
+    query = add_gezicht_wkt(query)
     query = fix_label_filter(query)
 
     if mode == "lijst":
