@@ -12,7 +12,7 @@ from typing import Any
 
 import requests
 
-from config import SPARQL_ENDPOINT, PROVINCIE_NAAM
+from config import SPARQL_ENDPOINT, PROVINCIE_NAAM, PROVINCIE_URI
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,20 @@ def execute(query: str) -> dict[str, Any]:
     data = response.json()
     data = _translate_provincie_uris(data)
 
+    # Voeg waarschuwing toe als resultaat gelijk is aan de LIMIT
+    # (Virtuoso heeft een max van 10000 rijen)
+    bindings = data.get("results", {}).get("bindings", [])
+    limit_match = None
+    import re as _re
+    limit_match = _re.search(r"\bLIMIT\s+(\d+)", query, _re.IGNORECASE)
+    if limit_match:
+        limit_val = int(limit_match.group(1))
+        if len(bindings) >= limit_val:
+            data["_warning"] = (
+                f"De resultaten zijn beperkt tot {limit_val} rijen (maximumlimiet bereikt). "
+                f"Er kunnen meer resultaten bestaan. Verfijn je zoekvraag voor volledigere resultaten."
+            )
+
     original = len(data.get("results", {}).get("bindings", []))
     data = _deduplicate(data)
     deduped = len(data.get("results", {}).get("bindings", []))
@@ -70,6 +84,88 @@ def _translate_provincie_uris(data: dict) -> dict:
         idx = vars_.index("provURI")
         vars_.insert(idx, "provincie")
     return data
+
+
+def load_gezicht_mapping() -> dict:
+    """
+    Haal alle gezicht URIs en namen op uit het endpoint bij opstarten.
+    Geeft een dict terug van lowercase naam -> URI.
+    Meerdere gezichten kunnen dezelfde plaatsnaam hebben (bijv. meerdere in Amsterdam).
+    In dat geval worden alle URIs opgeslagen als lijst.
+    """
+    query = """
+PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
+SELECT DISTINCT ?gezicht ?naam WHERE {
+  ?gezicht a ceo:Gezicht .
+  ?gezicht ceo:heeftNaam ?naamObj .
+  ?naamObj ceo:naam ?naam .
+}
+"""
+    try:
+        response = requests.get(
+            SPARQL_ENDPOINT,
+            params={"query": query, "format": "json"},
+            headers={"Accept": "application/sparql-results+json"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        mapping = {}
+        for row in data.get("results", {}).get("bindings", []):
+            naam = row["naam"]["value"].lower().strip()
+            uri = row["gezicht"]["value"]
+            if naam in mapping:
+                # Meerdere gezichten met zelfde naam — sla beide op als lijst
+                existing = mapping[naam]
+                if isinstance(existing, list):
+                    existing.append(uri)
+                else:
+                    mapping[naam] = [existing, uri]
+            else:
+                mapping[naam] = uri
+        logger.info("Gezichtmapping geladen: %d namen", len(mapping))
+        return mapping
+    except Exception as e:
+        logger.warning("Gezichtmapping kon niet worden geladen: %s", e)
+        return {}
+
+
+def load_gemeente_mapping() -> dict:
+    """
+    Haal alle gemeente URIs en labels op uit het endpoint bij opstarten.
+    Geeft een dict terug van lowercase label -> URI.
+    Meerdere labels per gemeente (bijv. Den Bosch / 's-Hertogenbosch) worden
+    allemaal gemapt naar dezelfde URI.
+    """
+    query = """
+PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT DISTINCT ?gemeente ?label WHERE {
+  ?rm a ceo:Rijksmonument .
+  ?rm ceo:heeftBasisregistratieRelatie ?brr .
+  ?brr ceo:heeftGemeente ?gemeente .
+  ?gemeente rdfs:label ?label .
+}
+"""
+    try:
+        response = requests.get(
+            SPARQL_ENDPOINT,
+            params={"query": query, "format": "json"},
+            headers={"Accept": "application/sparql-results+json"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        mapping = {}
+        for row in data.get("results", {}).get("bindings", []):
+            label = row["label"]["value"].lower().strip()
+            uri = row["gemeente"]["value"]
+            mapping[label] = uri
+        logger.info("Gemeentemapping geladen: %d labels voor gemeenten", len(mapping))
+        return mapping
+    except Exception as e:
+        logger.warning("Gemeentemapping kon niet worden geladen: %s", e)
+        return {}
 
 
 def _deduplicate(data: dict[str, Any]) -> dict[str, Any]:

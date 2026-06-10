@@ -9,13 +9,6 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
 
-# LLM provider: 'anthropic', 'google' of 'ollama'
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
-# Ollama
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:14b")
-OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
-OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "900"))
 
 def _require(key: str) -> str:
     value = os.getenv(key)
@@ -27,6 +20,8 @@ def _require(key: str) -> str:
     return value
 
 
+# LLM provider: 'anthropic' of 'google'
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "google")
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
@@ -42,12 +37,9 @@ FLASK_DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 
 SPARQL_PREFIXES = """\
 PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
-PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-PREFIX geof: <http://www.opengis.net/def/function/geosparql/>"""
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"""
 
 # Exacte provincie URIs uit de OWMS thesaurus
 # Alle gangbare spelwijzen mappen naar één URI per provincie
@@ -67,6 +59,14 @@ PROVINCIE_NAAM = {
     "http://standaarden.overheid.nl/owms/terms/Zeeland":              "Zeeland",
     "http://standaarden.overheid.nl/owms/terms/Zuid-Holland":         "Zuid-Holland",
 }
+
+# Gezichtmapping — wordt dynamisch geladen bij opstarten via executor.load_gezicht_mapping()
+# Bevat naam (lowercase) -> URI of lijst van URIs bij meerdere gezichten met zelfde naam
+GEZICHT_URI: dict = {}
+
+# Gemeentemapping — wordt dynamisch geladen bij opstarten via executor.load_gemeente_mapping()
+# Bevat alle labels (inclusief alternatieve namen zoals "Den Bosch") → OWMS URI
+GEMEENTE_URI: dict = {}
 
 PROVINCIE_URI = {
     "drenthe":              _BASE + "Drenthe",
@@ -96,7 +96,4 @@ PROVINCIE_URI = {
     "zuid holland":         _BASE + "Zuid-Holland",
     "zuidholland":          _BASE + "Zuid-Holland",
     "z-holland":            _BASE + "Zuid-Holland",
-    "nederlandse provincie utrecht": _BASE + "Utrecht_(provincie)",
-    "provincie friesland": _BASE + "Fryslan",
-    "provincie fryslân": _BASE + "Fryslan",
 }

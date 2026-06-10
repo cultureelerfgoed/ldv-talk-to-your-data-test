@@ -13,47 +13,17 @@ Verantwoordelijkheden:
 import re
 import logging
 
-from config import PROVINCIE_URI
+from config import SPARQL_PREFIXES, PROVINCIE_URI, GEMEENTE_URI, GEZICHT_URI
 
 logger = logging.getLogger(__name__)
 
 
-REQUIRED_PREFIXES = {
-    "ceo:": "PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>",
-    "graph:": "PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>",
-    "skos:": "PREFIX skos: <http://www.w3.org/2004/02/skos/core#>",
-    "rdf:": "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-    "rdfs:": "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-    "xsd:": "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>",
-    "geo:": "PREFIX geo: <http://www.opengis.net/ont/geosparql#>",
-    "geof:": "PREFIX geof: <http://www.opengis.net/def/function/geosparql/>",
-}
-
-
-def _declared_prefixes(query: str) -> set[str]:
-    """Geef alle prefixnamen terug die al gedeclareerd zijn."""
-    return {
-        match.group(1) + ":"
-        for match in re.finditer(
-            r"^\s*PREFIX\s+([A-Za-z][\w-]*)\s*:",
-            query,
-            flags=re.IGNORECASE | re.MULTILINE,
-        )
-    }
-
-
 def inject_prefixes(query: str) -> str:
-    """Voeg gebruikte prefixen toe als ze ontbreken."""
-    declared = _declared_prefixes(query)
-    additions: list[str] = []
-
-    for prefix, declaration in REQUIRED_PREFIXES.items():
-        if prefix in query and prefix not in declared:
-            additions.append(declaration)
-
-    if additions:
-        return "\n".join(additions) + "\n\n" + query
-
+    """Voeg verplichte prefixen toe als ze ontbreken."""
+    if "PREFIX ceo:" not in query:
+        return SPARQL_PREFIXES + "\n\n" + query
+    if "PREFIX rdfs:" not in query and "rdfs:" in query:
+        return "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" + query
     return query
 
 
@@ -67,37 +37,181 @@ def has_count(query: str) -> bool:
     return bool(re.search(r"\bCOUNT\b", query, re.IGNORECASE))
 
 
+def normalize_gezicht_uri(query: str) -> str:
+    """
+    Als de query een FILTER op een gezichtsnaam bevat, vervang die
+    door een directe URI match of een UNION van meerdere URIs als
+    er meerdere gezichten met dezelfde naam zijn.
+
+    Van:
+      ?gezicht ceo:heeftNaam ?naamObj . ?naamObj ceo:naam ?naam .
+      FILTER(CONTAINS(LCASE(?naam), "deventer"))
+
+    Naar (één gezicht):
+      FILTER(?gezicht = <https://...gezicht/10134270>)
+
+    Naar (meerdere gezichten):
+      FILTER(?gezicht IN (<https://...10134270>, <https://...10134635>))
+    """
+    if "Gezicht" not in query and "gezicht" not in query.lower():
+        return query
+    if not GEZICHT_URI:
+        return query
+
+    # Zoek FILTER op naam variabele
+    m = re.search(r'FILTER[^"]*"([^"]+)"', query, re.IGNORECASE)
+    if not m:
+        return query
+
+    ctx = query[max(0, m.start() - 200) : m.end() + 10]
+    if not any(x in ctx.lower() for x in ["gezicht", "naam"]):
+        return query
+
+    zoekterm = m.group(1).lower().strip()
+
+    # Zoek exacte match eerst
+    uri = GEZICHT_URI.get(zoekterm)
+
+    # Als geen exacte match, zoek gedeeltelijke match (bijv. "deventer" -> "Deventer")
+    if not uri:
+        matches = {k: v for k, v in GEZICHT_URI.items() if zoekterm in k}
+        if len(matches) == 1:
+            uri = list(matches.values())[0]
+        elif len(matches) > 1:
+            # Meerdere matches — bouw FILTER IN op
+            all_uris = []
+            for v in matches.values():
+                if isinstance(v, list):
+                    all_uris.extend(v)
+                else:
+                    all_uris.append(v)
+            uri_list = ", ".join(f"<{u}>" for u in all_uris)
+            logger.info("Meerdere gezichten gevonden voor '%s': %d matches", zoekterm, len(all_uris))
+            # Vervang de naam FILTER door een URI IN filter
+            lines = query.split("\n")
+            lines = [l for l in lines if not ("FILTER" in l and "naam" in l.lower() and "CONTAINS" in l)]
+            query = "\n".join(lines)
+            query = re.sub(
+                r'([?]\w+)\s+ceo:heeftNaam\s+[?]\w+\s*\.\s*\n?\s*[?]\w+\s+ceo:naam\s+[?]\w+\s*\.\s*\n?',
+                '', query
+            )
+            # Voeg FILTER IN toe na de gezicht variabele declaratie
+            query = re.sub(
+                r'([?]\w+)\s+a\s+ceo:Gezicht\s*\.',
+                lambda m2: m2.group(0) + f"\n  FILTER({m2.group(1)} IN ({uri_list}))",
+                query
+            )
+            return query
+
+    if not uri:
+        logger.debug("Gezicht '%s' niet gevonden in mapping", zoekterm)
+        return query
+
+    # Eén URI gevonden
+    uris = uri if isinstance(uri, list) else [uri]
+    uri_list = ", ".join(f"<{u}>" for u in uris)
+    filter_expr = f"FILTER(?gezicht IN ({uri_list}))" if len(uris) > 1 else f"FILTER(?gezicht = <{uris[0]}>)"
+
+    logger.info("Gezicht '%s' genormaliseerd naar %d URI(s)", zoekterm, len(uris))
+
+    # Verwijder naam triple en FILTER
+    lines = query.split("\n")
+    lines = [l for l in lines if not ("ceo:naam" in l and "naamObj" in l.lower())]
+    lines = [l for l in lines if not ("heeftNaam" in l)]
+    lines = [l for l in lines if not ("FILTER" in l and "naam" in l.lower() and "CONTAINS" in l)]
+    query = "\n".join(lines)
+
+    # Voeg URI filter toe na ceo:Gezicht declaratie
+    query = re.sub(
+        r'([?]\w+)\s+a\s+ceo:Gezicht\s*\.',
+        lambda m2: m2.group(0) + f"\n  {filter_expr}",
+        query
+    )
+    return query
+
+
+def normalize_gemeente_uri(query: str) -> str:
+    """
+    Vervang gemeente-filterpad door een directe URI match.
+    Gebruikt de dynamisch geladen GEMEENTE_URI mapping.
+
+    Van:
+      ?brk ceo:gemeentenaam ?gemeente .
+      FILTER(CONTAINS(LCASE(?gemeente), "den bosch"))
+
+    Naar:
+      ?brr ceo:heeftGemeente <http://...s-Hertogenbosch_(gemeente)> .
+    """
+    if "gemeentenaam" not in query and "heeftGemeente" not in query:
+        return query
+    if not GEMEENTE_URI:
+        return query  # mapping nog niet geladen, laat query ongewijzigd
+
+    # Zoek FILTER op gemeentenaam
+    m = re.search(r'FILTER[^"]*"([^"]+)"', query, re.IGNORECASE)
+    if not m:
+        return query
+
+    ctx = query[max(0, m.start() - 150) : m.end() + 10]
+    if not any(x in ctx.lower() for x in ["gemeente", "woonplaats"]):
+        return query
+
+    zoekterm = m.group(1).lower().strip()
+    uri = GEMEENTE_URI.get(zoekterm)
+    if not uri:
+        logger.debug("Gemeente '%s' niet gevonden in mapping", zoekterm)
+        return query
+
+    logger.info("Gemeente '%s' genormaliseerd naar URI: %s", zoekterm, uri)
+
+    # Verwijder de gemeentenaam triple en FILTER
+    lines = query.split("\n")
+    lines = [l for l in lines if not ("gemeentenaam" in l.lower() and "filter" not in l.lower())]
+    lines = [l for l in lines if not ("FILTER" in l and "gemeente" in l.lower())]
+    query = "\n".join(lines)
+
+    # Vervang heeftBRKRelatie pad door heeftGemeente met directe URI
+    # Verwijder: ?brr ceo:heeftBRKRelatie ?brk .
+    query = re.sub(
+        r'[?]\w+\s+ceo:heeftBRKRelatie\s+[?]\w+\s*\.\s*\n?',
+        '', query
+    )
+    # Voeg heeftGemeente toe aan de BasisregistratieRelatie
+    query = re.sub(
+        r'([?]\w+)\s+ceo:heeftBasisregistratieRelatie\s+([?]\w+)\s*\.',
+        lambda m2: m2.group(1) + ' ceo:heeftBasisregistratieRelatie ' + m2.group(2) + ' .\n  ' +
+                   m2.group(2) + ' ceo:heeftGemeente <' + uri + '> .',
+        query,
+        count=1
+    )
+    return query
+
+
 def fix_provincie_pad(query: str) -> str:
     """
-    Zorg dat heeftProvincie altijd via rdfs:label loopt als het model een variabele gebruikt.
+    Zorg dat heeftProvincie altijd via rdfs:label loopt.
 
     Als het LLM alleen ?brr ceo:heeftProvincie ?prov . genereert
     zonder rdfs:label stap, voeg die dan toe.
     """
     if "heeftProvincie" not in query:
         return query
-
     if "provURI" in query or "rdfs:label" in query:
         return query
-
     query = re.sub(
         r"([?]\w+)\s+ceo:heeftProvincie\s+([?]\w+)\s*\.",
         lambda m: (
-            m.group(1)
-            + " ceo:heeftProvincie ?provURI .\n"
-            + "?provURI rdfs:label "
-            + m.group(2)
-            + " ."
+            m.group(1) + " ceo:heeftProvincie ?provURI . "
+            "?provURI rdfs:label " + m.group(2) + " ."
         ),
         query,
     )
-
     return query
 
 
 def normalize_provincie_uri(query: str) -> str:
     """
-    Vervang provincie-label-filter door directe URI match.
+    Vervang het provincie-filterpad door een directe URI match.
 
     Van:
       ?provURI rdfs:label ?provincie .
@@ -110,81 +224,58 @@ def normalize_provincie_uri(query: str) -> str:
         return query
 
     m = re.search(r'FILTER[^"]*"([^"]+)"', query, re.IGNORECASE)
-
     if not m:
         return query
 
-    ctx = query[max(0, m.start() - 150): m.end() + 50].lower()
-
-    if not any(x in ctx for x in ["provinci", "provlabel", "provuri"]):
+    ctx = query[max(0, m.start() - 100) : m.end() + 10]
+    if not any(x in ctx.lower() for x in ["provinci", "provlabel"]):
         return query
 
     zoekterm = m.group(1).lower().strip()
     uri = PROVINCIE_URI.get(zoekterm)
-
     if not uri:
-        logger.warning(
-            "Onbekende provincie: '%s' - filter niet genormaliseerd",
-            zoekterm,
-        )
+        logger.warning("Onbekende provincie: '%s' — filter niet genormaliseerd", zoekterm)
         return query
 
-    logger.info(
-        "Provincie '%s' genormaliseerd naar URI: %s",
-        zoekterm,
-        uri,
-    )
-
+    logger.info("Provincie '%s' genormaliseerd naar URI: %s", zoekterm, uri)
     lines = query.split("\n")
-
-    lines = [
-        line
-        for line in lines
-        if not (
-            "rdfs:label" in line
-            and re.search(r"\?prov\w*", line, re.IGNORECASE)
-        )
-    ]
-
-    lines = [
-        line
-        for line in lines
-        if not ("FILTER" in line and zoekterm in line.lower())
-    ]
-
+    lines = [l for l in lines if not ("rdfs:label" in l and "provinci" in l.lower())]
+    lines = [l for l in lines if not ("FILTER" in l and "provinci" in l.lower())]
     query = "\n".join(lines)
-
     query = re.sub(
         r"ceo:heeftProvincie\s+[?]\w+\s*\.",
         "ceo:heeftProvincie <" + uri + "> .",
         query,
     )
-
     return query
 
 
 def fix_label_filter(query: str) -> str:
     """
-    Vervang FILTER(LCASE(?x) = "waarde") door CONTAINS-variant.
-    Taalgelabelde strings kunnen niet altijd netjes met = vergeleken worden.
+    Vervang FILTER(LCASE(?x) = "waarde") door FILTER(CONTAINS(LCASE(?x), "waarde")).
+    Taalgelabelde strings kunnen niet met = vergeleken worden.
     """
     return re.sub(
-        r"FILTER\s*\(\s*LCASE\s*\(\s*STR\s*\((\?\w+)\)\s*\)\s*=\s*(\"[^\"]+\")\s*\)",
-        lambda m: "FILTER(CONTAINS(LCASE(STR(" + m.group(1) + ")), " + m.group(2) + "))",
+        r"FILTER\s*\(\s*LCASE\s*\((\?\w+)\)\s*=\s*(\"[\w\s]+\")\s*\)",
+        lambda m: "FILTER(CONTAINS(LCASE(" + m.group(1) + "), " + m.group(2) + "))",
         query,
         flags=re.IGNORECASE,
     )
 
-def is_incomplete_query(query: str) -> bool:
-    """Geeft True als de SPARQL-query duidelijk onvolledig is."""
-    q = query.strip()
 
-    return (
-        q.count("<") != q.count(">")
-        or q.count("{") != q.count("}")
-        or "SELECT" not in q.upper()
-        or "WHERE" not in q.upper()
-    )
+def add_safety_limit(query: str, max_rows: int = 10000) -> str:
+    """Zet LIMIT altijd op 10000 (Virtuoso maximum).
+    Vervangt ook lagere LIMITs die het LLM genereert.
+    """
+    existing = re.search(r"\bLIMIT\s+(\d+)", query, re.IGNORECASE)
+    if existing:
+        current = int(existing.group(1))
+        if current < max_rows:
+            query = re.sub(r"\bLIMIT\s+\d+", f"LIMIT {max_rows}", query, flags=re.IGNORECASE)
+    else:
+        query = query.strip() + f"\nLIMIT {max_rows}"
+    return query
+
 
 def postprocess(query: str, mode: str) -> str:
     """
@@ -196,18 +287,20 @@ def postprocess(query: str, mode: str) -> str:
     3. Fix provincie pad
     4. Normaliseer provincie naar URI
     5. Fix label filters
-    6. Inject prefixen opnieuw, want fixes kunnen rdfs toevoegen
-    7. Verwijder LIMIT in lijstmodus
+    6. Verwijder LIMIT (als lijst-modus) — altijd als laatste
     """
     query = query.replace("```sparql", "").replace("```", "").strip()
-
     query = inject_prefixes(query)
+    query = normalize_gezicht_uri(query)
+    query = normalize_gemeente_uri(query)
     query = fix_provincie_pad(query)
     query = normalize_provincie_uri(query)
     query = fix_label_filter(query)
-    query = inject_prefixes(query)
 
     if mode == "lijst":
         query = remove_limit(query)
+    # Tellingsvragen krijgen geen LIMIT — die geven sowieso weinig rijen terug
+    if mode != "telling":
+        query = add_safety_limit(query, max_rows=10000)
 
     return query

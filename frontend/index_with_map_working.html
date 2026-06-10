@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RCE Erfgoed Assistent</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 
@@ -886,20 +884,6 @@
     background: var(--paper);
   }
 
-  .limit-warning {
-    background: #fff8e6;
-    border: 1px solid #f0c040;
-    border-radius: var(--radius-sm);
-    padding: 0.6rem 1rem;
-    font-size: 0.8rem;
-    color: #7a5a00;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-  }
-  .limit-warning::before { content: "\26A0"; font-size: 1rem; }
-
   .leaflet-popup-content {
     font-family: "DM Sans", sans-serif;
     font-size: 0.82rem;
@@ -1139,7 +1123,6 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 const API = window.location.origin + '/api';
 
@@ -1786,15 +1769,7 @@ function initResultMap(bindings, vars) {
   }).addTo(currentMap);
 
   const geometryVars = findGeometryVars(vars);
-
-  const clusterGroup = L.markerClusterGroup({
-    maxClusterRadius: 40,
-    disableClusteringAtZoom: 14,
-    chunkedLoading: true,
-    chunkInterval: 100,
-    chunkDelay: 50,
-  });
-  const polygonGroup = L.featureGroup().addTo(currentMap);
+  const group = L.featureGroup().addTo(currentMap);
 
   bindings.forEach(row => {
     const popupHtml = popupForRow(row, vars);
@@ -1806,23 +1781,18 @@ function initResultMap(bindings, vars) {
 
       layers.forEach(layer => {
         styleLayerByVar(layer, v);
-        const finalLayer = layerToMarkerIfMonument(layer, v, popupHtml);
 
-        if (finalLayer instanceof L.Marker || finalLayer instanceof L.CircleMarker) {
-          clusterGroup.addLayer(finalLayer);
-        } else {
-          polygonGroup.addLayer(finalLayer);
-        }
+        const finalLayer = layerToMarkerIfMonument(layer, v, popupHtml);
+        finalLayer.addTo(group);
       });
     });
   });
 
-  currentMap.addLayer(clusterGroup);
-
-  const allLayers = L.featureGroup([clusterGroup, polygonGroup]);
-  const bounds = allLayers.getBounds();
-  if (bounds.isValid()) {
-    currentMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+  if (group.getLayers().length) {
+    currentMap.fitBounds(group.getBounds(), {
+      padding: [30, 30],
+      maxZoom: 15,
+    });
   }
 
   setTimeout(() => currentMap.invalidateSize(), 100);
@@ -1851,10 +1821,6 @@ function renderResultsCard(sparqlResults, elapsed) {
     `;
   }
 
-  const warningHtml = sparqlResults._warning
-    ? '<div class="limit-warning">' + escapeHTML(sparqlResults._warning) + '</div>'
-    : '';
-
   const rowText = bindings.length === 1 ? '1 rij' : bindings.length + ' rijen';
 
   return `
@@ -1864,7 +1830,6 @@ function renderResultsCard(sparqlResults, elapsed) {
         <h4>Resultaten</h4>
       </div>
       <div class="card-body">
-        ${warningHtml}
         <div class="result-toolbar">
           <div class="result-count">${escapeHTML(rowText)} gevonden</div>
           <div class="toolbar-actions">
