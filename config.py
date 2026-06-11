@@ -91,7 +91,7 @@ PROVINCIE_URI = {
     "overijssel":           _BASE + "Overijssel",
     "utrecht":              _BASE + "Utrecht_(provincie)",
     "provincie utrecht":    _BASE + "Utrecht_(provincie)",
-    "zeeland":              _BASE + "Zeeland",
+    "zeeland":              _BASE + "Zeeland_(provincie)",
     "zuid-holland":         _BASE + "Zuid-Holland",
     "zuid holland":         _BASE + "Zuid-Holland",
     "zuidholland":          _BASE + "Zuid-Holland",
