@@ -15,6 +15,8 @@ import logging
 
 from config import SPARQL_PREFIXES, PROVINCIE_URI, GEMEENTE_URI, GEZICHT_URI
 
+CBS_GRAPH = 'https://linkeddata.cultureelerfgoed.nl/rce/cho/graphs/cbs_woonplaatsen'
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,7 +25,9 @@ def inject_prefixes(query: str) -> str:
     if "PREFIX ceo:" not in query:
         return SPARQL_PREFIXES + "\n\n" + query
     if "PREFIX rdfs:" not in query and "rdfs:" in query:
-        return "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" + query
+        query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" + query
+    if "PREFIX cbs:" not in query and "cbs:" in query:
+        query = "PREFIX cbs: <https://opendata.cbs.nl/woonplaatsen/>\n" + query
     return query
 
 
@@ -128,6 +132,7 @@ def normalize_gezicht_uri(query: str) -> str:
         query
     )
     return query
+
 
 
 def normalize_gemeente_uri(query: str) -> str:

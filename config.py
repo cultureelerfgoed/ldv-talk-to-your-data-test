@@ -56,7 +56,7 @@ PROVINCIE_NAAM = {
     "http://standaarden.overheid.nl/owms/terms/Noord-Holland":        "Noord-Holland",
     "http://standaarden.overheid.nl/owms/terms/Overijssel":           "Overijssel",
     "http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)":  "Utrecht",
-    "http://standaarden.overheid.nl/owms/terms/Zeeland_(provincie)":  "Zeeland",
+    "http://standaarden.overheid.nl/owms/terms/Zeeland":              "Zeeland",
     "http://standaarden.overheid.nl/owms/terms/Zuid-Holland":         "Zuid-Holland",
 }
 
@@ -91,8 +91,7 @@ PROVINCIE_URI = {
     "overijssel":           _BASE + "Overijssel",
     "utrecht":              _BASE + "Utrecht_(provincie)",
     "provincie utrecht":    _BASE + "Utrecht_(provincie)",
-    "provincie zeeland":    _BASE + "Zeeland_(provincie)",
-    "zeeland":              _BASE + "Zeeland_(provincie)",
+    "zeeland":              _BASE + "Zeeland",
     "zuid-holland":         _BASE + "Zuid-Holland",
     "zuid holland":         _BASE + "Zuid-Holland",
     "zuidholland":          _BASE + "Zuid-Holland",

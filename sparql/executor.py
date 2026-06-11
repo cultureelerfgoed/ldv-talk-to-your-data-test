@@ -42,6 +42,15 @@ def execute(query: str) -> dict[str, Any]:
     data = response.json()
     data = _translate_provincie_uris(data)
 
+    # Voeg waarschuwing toe als query ceo:woonplaatsnaam gebruikt
+    if "woonplaatsnaam" in query and "ArcheologischOnderzoeksgebied" in query:
+        data["_warning_woonplaats"] = (
+            "Let op: de woonplaatsnamen bij archeologische onderzoeksgebieden zijn "
+            "handmatig ingevoerd en kunnen afwijken van officiële BAG-namen. "
+            "Resultaten kunnen onvolledig of onjuist zijn door spellingsverschillen "
+            "(bijv. 'Alphen' i.p.v. 'Alphen aan den Rijn')."
+        )
+
     # Voeg waarschuwing toe als resultaat gelijk is aan de LIMIT
     # (Virtuoso heeft een max van 10000 rijen)
     bindings = data.get("results", {}).get("bindings", [])
@@ -84,6 +93,65 @@ def _translate_provincie_uris(data: dict) -> dict:
         idx = vars_.index("provURI")
         vars_.insert(idx, "provincie")
     return data
+
+
+GG_ENDPOINT = "https://api.druid.datalegend.net/datasets/nlgis/gemeentegeschiedenis/sparql"
+
+# Mapping van provincie-URI in gemeentegeschiedenis naar OWMS provincie URI
+GG_PROVINCIE_MAP = {
+    "province:Drenthe":       "http://standaarden.overheid.nl/owms/terms/Drenthe",
+    "province:Flevoland":     "http://standaarden.overheid.nl/owms/terms/Flevoland",
+    "province:Friesland":     "http://standaarden.overheid.nl/owms/terms/Fryslan",
+    "province:Gelderland":    "http://standaarden.overheid.nl/owms/terms/Gelderland",
+    "province:Groningen":     "http://standaarden.overheid.nl/owms/terms/Groningen_(provincie)",
+    "province:Limburg":       "http://standaarden.overheid.nl/owms/terms/Limburg",
+    "province:Noord-Brabant": "http://standaarden.overheid.nl/owms/terms/Noord-Brabant",
+    "province:Noord-Holland": "http://standaarden.overheid.nl/owms/terms/Noord-Holland",
+    "province:Overijssel":    "http://standaarden.overheid.nl/owms/terms/Overijssel",
+    "province:Utrecht":       "http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)",
+    "province:Zeeland":       "http://standaarden.overheid.nl/owms/terms/Zeeland",
+    "province:Zuid-Holland":  "http://standaarden.overheid.nl/owms/terms/Zuid-Holland",
+}
+
+
+def load_woonplaats_provincie_mapping() -> dict:
+    """
+    Laad woonplaats → OWMS provincie URI mapping via gemeentegeschiedenis.nl.
+    Matcht gemeentenamen op woonplaatsnamen (huidige gemeenten zonder einddatum).
+    Geeft dict terug van lowercase woonplaatsnaam -> OWMS provincie URI.
+    """
+    query = """
+PREFIX gg: <http://www.gemeentegeschiedenis.nl/gg-schema#>
+SELECT DISTINCT ?naam ?provURI WHERE {
+  ?gem a gg:Municipality .
+  ?gem gg:name ?naam .
+  ?gem gg:inProvince ?provURI .
+  FILTER NOT EXISTS { ?gem gg:endDate ?end }
+}
+"""
+    try:
+        response = requests.get(
+            GG_ENDPOINT,
+            params={"query": query, "format": "json"},
+            headers={"Accept": "application/sparql-results+json"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        mapping = {}
+        for row in data.get("results", {}).get("bindings", []):
+            naam = row["naam"]["value"].lower().strip()
+            prov_raw = row["provURI"]["value"]
+            # Normaliseer province: prefix naar OWMS URI
+            prov_key = "province:" + prov_raw.split("/")[-1]
+            owms_uri = GG_PROVINCIE_MAP.get(prov_key)
+            if owms_uri:
+                mapping[naam] = owms_uri
+        logger.info("Woonplaats-provincie mapping geladen: %d woonplaatsen", len(mapping))
+        return mapping
+    except Exception as e:
+        logger.warning("Woonplaats-provincie mapping kon niet worden geladen: %s", e)
+        return {}
 
 
 def load_gezicht_mapping() -> dict:

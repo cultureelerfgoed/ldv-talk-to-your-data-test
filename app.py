@@ -52,6 +52,8 @@ def generate_sparql():
 
     try:
         query = sparql_generator.generate(question, mode)
+        if query.strip().startswith("SPARQL_TOO_HEAVY:"):
+            return jsonify({"error": query.strip()}), 422
         return jsonify({"query": query})
     except Exception as e:
         logger.exception("Fout bij SPARQL generatie")
