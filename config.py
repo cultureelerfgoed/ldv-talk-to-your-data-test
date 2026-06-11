@@ -56,7 +56,7 @@ PROVINCIE_NAAM = {
     "http://standaarden.overheid.nl/owms/terms/Noord-Holland":        "Noord-Holland",
     "http://standaarden.overheid.nl/owms/terms/Overijssel":           "Overijssel",
     "http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)":  "Utrecht",
-    "http://standaarden.overheid.nl/owms/terms/Zeeland":              "Zeeland",
+    "http://standaarden.overheid.nl/owms/terms/Zeeland_(provincie)":  "Zeeland",
     "http://standaarden.overheid.nl/owms/terms/Zuid-Holland":         "Zuid-Holland",
 }
 
