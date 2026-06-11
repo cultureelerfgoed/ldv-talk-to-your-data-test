@@ -173,7 +173,7 @@ PROVINCIE URI'S
 - Noord-Holland: <http://standaarden.overheid.nl/owms/terms/Noord-Holland>
 - Overijssel: <http://standaarden.overheid.nl/owms/terms/Overijssel>
 - Utrecht: <http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)>
-- Zeeland: <http://standaarden.overheid.nl/owms/terms/Zeeland>
+- Zeeland: <http://standaarden.overheid.nl/owms/terms/Zeeland_(provincie)>
 - Zuid-Holland: <http://standaarden.overheid.nl/owms/terms/Zuid-Holland>
 
 RIJKSMONUMENTEN
