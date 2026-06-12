@@ -1,5 +1,5 @@
 """
-SPARQL query generator — ondersteunt Anthropic, Google Gemini en Ollama.
+SPARQL query generator — ondersteunt Anthropic en Google Gemini.
 Provider wordt bepaald via LLM_PROVIDER in config/environment.
 """
 
@@ -18,106 +18,33 @@ def _load_prompt(name: str) -> str:
     return (_PROMPTS_DIR / f"{name}.txt").read_text(encoding="utf-8")
 
 
-def _load_optional_prompt(name: str) -> str:
-    path = _PROMPTS_DIR / f"{name}.txt"
-
-    if not path.exists():
-        logger.warning("Optioneel promptbestand ontbreekt: %s", path)
-        return ""
-
-    return path.read_text(encoding="utf-8")
-
-
-def _build_system_prompt(mode: str) -> str:
-    """
-    Bouw de system prompt.
-
-    Belangrijk:
-    - telling.txt moet klein en strak blijven
-    - datamodel_rules.txt is te groot voor simpele tellingen
-    - lijstvragen mogen wel de volledige datamodelregels gebruiken
-    """
-
-    base_prompt = _load_prompt(mode)
-
-    if mode == "telling":
-        return base_prompt
-
-    datamodel_rules = _load_optional_prompt("datamodel_rules")
-
-    parts = [base_prompt]
-
-    if datamodel_rules.strip():
-        parts.append(datamodel_rules)
-
-    return "\n\n".join(parts)
-
-
 def _generate_anthropic(question: str, system_prompt: str) -> str:
     import anthropic
-
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-
     message = client.messages.create(
         model=config.ANTHROPIC_MODEL,
-        max_tokens=1200,
+        max_tokens=1000,
         system=system_prompt,
         messages=[{"role": "user", "content": question}],
     )
-
     return message.content[0].text
 
 
 def _generate_google(question: str, system_prompt: str) -> str:
     import google.generativeai as genai
-
     genai.configure(api_key=config.GOOGLE_API_KEY)
-
     model = genai.GenerativeModel(
         model_name=config.GOOGLE_MODEL,
         system_instruction=system_prompt,
     )
-
     response = model.generate_content(question)
-
     return response.text
 
 
-def _generate_ollama(question: str, system_prompt: str) -> str:
-    import ollama
-
-    response = ollama.chat(
-        model=config.OLLAMA_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question},
-        ],
-        options={
-            "temperature": 0,
-            "num_ctx": int(getattr(config, "OLLAMA_NUM_CTX", 12000)),
-            "num_predict": int(getattr(config, "OLLAMA_NUM_PREDICT", 1800)),
-        },
-    )
-
-    return response["message"]["content"]
-
-
 def _generate(question: str, system_prompt: str) -> str:
-    provider = config.LLM_PROVIDER.lower()
-
-    if provider == "ollama":
-        return _generate_ollama(question, system_prompt)
-
-    if provider == "google":
+    if config.LLM_PROVIDER == "google":
         return _generate_google(question, system_prompt)
-
-    if provider == "anthropic":
-        return _generate_anthropic(question, system_prompt)
-
-    raise ValueError(
-        f"Onbekende LLM_PROVIDER: {config.LLM_PROVIDER}. "
-        "Gebruik 'ollama', 'google' of 'anthropic'."
-    )
+    return _generate_anthropic(question, system_prompt)
 
 
 def generate(question: str, mode: str) -> str:
@@ -131,29 +58,17 @@ def generate(question: str, mode: str) -> str:
     Returns:
         Een nabewerkte SPARQL query als string.
     """
-
-    system_prompt = _build_system_prompt(mode)
-
-    logger.info(
-        "Query genereren via %s (modus: %s)",
-        config.LLM_PROVIDER,
-        mode,
-    )
+    system_prompt = _load_prompt(mode)
+    logger.info("Query genereren via %s (modus: %s)", config.LLM_PROVIDER, mode)
 
     query = _generate(question, system_prompt)
-    query = postprocess(query, mode)
+    query = postprocess(query, mode, question)
 
     if mode == "lijst" and has_count(query):
         logger.warning("LLM genereerde COUNT in lijstmodus — correctie-aanroep")
-
-        corrected = (
-            question
-            + " (geef een lijst van individuele resultaten, geen telling)"
-        )
-
+        corrected = question + " (geef een lijst van individuele monumenten, geen telling)"
         query = _generate(corrected, system_prompt)
-        query = postprocess(query, mode)
+        query = postprocess(query, mode, question)
 
     logger.info("Query gegenereerd (%d tekens)", len(query))
-
     return query

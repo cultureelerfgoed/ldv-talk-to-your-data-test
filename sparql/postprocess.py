@@ -28,6 +28,8 @@ def inject_prefixes(query: str) -> str:
         query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" + query
     if "PREFIX cbs:" not in query and "cbs:" in query:
         query = "PREFIX cbs: <https://opendata.cbs.nl/woonplaatsen/>\n" + query
+    if "PREFIX rn:" not in query and "rn:" in query:
+        query = "PREFIX rn: <https://data.cultureelerfgoed.nl/term/id/rn/2/>\n" + query
     return query
 
 
@@ -192,6 +194,84 @@ def normalize_gemeente_uri(query: str) -> str:
     return query
 
 
+JURIDISCHE_STATUS_RM = "rn:b2d9a59a-fe1e-4552-9a05-3c2acddff864"
+
+
+def add_juridische_status_filter(query: str, question: str = "") -> str:
+    """
+    Voeg automatisch de standaard juridische status filter (rijksmonument) toe
+    als de query ?rm a ceo:Rijksmonument gebruikt maar de filter ontbreekt.
+
+    Wordt overgeslagen als de vraag expliciet om alle statussen vraagt
+    (bijv. "ongeacht status", "alle statussen", "afgevoerd", "voorbeschermd").
+    """
+    if "Rijksmonument" not in query:
+        return query
+    if "heeftJuridischeStatus" in query:
+        return query
+
+    # Als de vraag expliciet over status gaat, niet automatisch invullen
+    status_keywords = [
+        "status", "voorbescherm", "afgevoerd", "voormalig",
+        "geen rijksmonument", "ongeacht"
+    ]
+    if any(kw in question.lower() for kw in status_keywords):
+        logger.debug("Status-gerelateerde vraag — geen automatische filter toegevoegd")
+        return query
+
+    return re.sub(
+        r"([?]\w+)\s+a\s+ceo:Rijksmonument\s*\.",
+        lambda m: m.group(0) + "\n  " + m.group(1) +
+                  " ceo:heeftJuridischeStatus " + JURIDISCHE_STATUS_RM + " .",
+        query,
+        count=1,
+    )
+
+
+def add_geometry_optional(query: str) -> str:
+    """
+    Voeg automatisch OPTIONAL geometrie toe als de hoofdklasse geometrie kan hebben
+    maar ?wkt nog niet in de query zit. Zo toont de kaart altijd resultaten als
+    geometrie beschikbaar is, ook als het LLM dit vergeet.
+    """
+    if "asWKT" in query:
+        return query
+
+    # Welke hoofdklasse wordt bevraagd en welke variabele hoort erbij
+    klasse_var = None
+    for klasse in ["Rijksmonument", "Gezicht", "ArcheologischOnderzoeksgebied", "Werelderfgoed"]:
+        m = re.search(r"([?]\w+)\s+a\s+ceo:" + klasse + r"\s*\.", query)
+        if m:
+            klasse_var = m.group(1)
+            break
+
+    if not klasse_var:
+        return query
+
+    # Voeg PREFIX geo: toe als die ontbreekt
+    if "PREFIX geo:" not in query:
+        query = "PREFIX geo: <http://www.opengis.net/ont/geosparql#>\n" + query
+
+    # Voeg ?wkt toe aan SELECT
+    query = re.sub(
+        r"(SELECT\s+(?:DISTINCT\s+)?)((?:\?\w+\s*)+)",
+        lambda m: m.group(1) + m.group(2).rstrip() + " ?wkt ",
+        query,
+        count=1,
+    )
+
+    # Voeg OPTIONAL geometrie toe na de klasse-declaratie
+    query = re.sub(
+        r"(" + re.escape(klasse_var) + r"\s+a\s+ceo:\w+\s*\.)",
+        lambda m: m.group(0) + "\n  OPTIONAL { " + klasse_var +
+                  " ceo:heeftGeometrie ?geom . ?geom geo:asWKT ?wkt . }",
+        query,
+        count=1,
+    )
+
+    return query
+
+
 def fix_provincie_pad(query: str) -> str:
     """
     Zorg dat heeftProvincie altijd via rdfs:label loopt.
@@ -321,7 +401,7 @@ def add_safety_limit(query: str, max_rows: int = 10000) -> str:
     return query
 
 
-def postprocess(query: str, mode: str) -> str:
+def postprocess(query: str, mode: str, question: str = "") -> str:
     """
     Pas alle nabewerking toe op een gegenereerde SPARQL query.
 
@@ -335,6 +415,8 @@ def postprocess(query: str, mode: str) -> str:
     """
     query = query.replace("```sparql", "").replace("```", "").strip()
     query = inject_prefixes(query)
+    query = add_juridische_status_filter(query, question)
+    query = add_geometry_optional(query)
     query = normalize_gezicht_uri(query)
     query = normalize_gemeente_uri(query)
     query = fix_provincie_pad(query)
