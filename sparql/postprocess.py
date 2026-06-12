@@ -13,7 +13,8 @@ Verantwoordelijkheden:
 import re
 import logging
 
-from config import SPARQL_PREFIXES, PROVINCIE_URI, GEMEENTE_URI, GEZICHT_URI
+import config
+from config import SPARQL_PREFIXES, PROVINCIE_URI
 
 CBS_GRAPH = 'https://linkeddata.cultureelerfgoed.nl/rce/cho/graphs/cbs_woonplaatsen'
 
@@ -61,7 +62,7 @@ def normalize_gezicht_uri(query: str) -> str:
     """
     if "Gezicht" not in query and "gezicht" not in query.lower():
         return query
-    if not GEZICHT_URI:
+    if not config.GEZICHT_URI:
         return query
 
     # Zoek FILTER op naam variabele
@@ -76,11 +77,11 @@ def normalize_gezicht_uri(query: str) -> str:
     zoekterm = m.group(1).lower().strip()
 
     # Zoek exacte match eerst
-    uri = GEZICHT_URI.get(zoekterm)
+    uri = config.GEZICHT_URI.get(zoekterm)
 
     # Als geen exacte match, zoek gedeeltelijke match (bijv. "deventer" -> "Deventer")
     if not uri:
-        matches = {k: v for k, v in GEZICHT_URI.items() if zoekterm in k}
+        matches = {k: v for k, v in config.GEZICHT_URI.items() if zoekterm in k}
         if len(matches) == 1:
             uri = list(matches.values())[0]
         elif len(matches) > 1:
@@ -137,10 +138,15 @@ def normalize_gezicht_uri(query: str) -> str:
 
 
 
+def remove_empty_optional(query: str) -> str:
+    """Verwijder lege OPTIONAL {} blokken (kunnen ontstaan na postprocessing)."""
+    return re.sub(r'OPTIONAL\s*\{\s*\}', '', query)
+
+
 def normalize_gemeente_uri(query: str) -> str:
     """
     Vervang gemeente-filterpad door een directe URI match.
-    Gebruikt de dynamisch geladen GEMEENTE_URI mapping.
+    Gebruikt de dynamisch geladen config.GEMEENTE_URI mapping.
 
     Van:
       ?brk ceo:gemeentenaam ?gemeente .
@@ -151,30 +157,55 @@ def normalize_gemeente_uri(query: str) -> str:
     """
     if "gemeentenaam" not in query and "heeftGemeente" not in query:
         return query
-    if not GEMEENTE_URI:
+
+    # Als de gezicht-URI al is opgelost (normalize_gezicht_uri), is de locatie
+    # al bepaald. ceo:Gezicht heeft geen heeftBasisregistratieRelatie, dus
+    # een eventuele (foutieve) gemeentefilter op ?gezicht moet verwijderd worden.
+    if re.search(r'FILTER\s*\(\s*\?gezicht\s*(=|IN\b)', query, re.IGNORECASE):
+        lines = query.split("\n")
+        cleaned = []
+        skip_next_empty_optional = False
+        for l in lines:
+            if "?gezicht" in l and ("heeftBasisregistratieRelatie" in l or "heeftGemeente" in l):
+                continue
+            if re.match(r'^\s*\?\w+\s+ceo:heeftGemeente\s+<[^>]+>\s*\.\s*$', l) and "?brr" in l:
+                continue
+            cleaned.append(l)
+        query = "\n".join(cleaned)
+        return query
+    if not config.GEMEENTE_URI:
         return query  # mapping nog niet geladen, laat query ongewijzigd
 
-    # Zoek FILTER op gemeentenaam
-    m = re.search(r'FILTER[^"]*"([^"]+)"', query, re.IGNORECASE)
-    if not m:
+    # Zoek de volledige FILTER regel die over gemeente gaat
+    filter_match = None
+    for fm in re.finditer(r'FILTER\s*\([^\n]*\)', query, re.IGNORECASE):
+        if any(x in fm.group(0).lower() for x in ["gemeente", "woonplaats"]):
+            filter_match = fm
+            break
+    if not filter_match:
         return query
 
-    ctx = query[max(0, m.start() - 150) : m.end() + 10]
-    if not any(x in ctx.lower() for x in ["gemeente", "woonplaats"]):
-        return query
+    # Probeer elke quoted string in deze FILTER op de mapping
+    zoektermen = re.findall(r'"([^"]+)"', filter_match.group(0))
+    uri = None
+    zoekterm = None
+    for term in zoektermen:
+        candidate = term.lower().strip()
+        if candidate in config.GEMEENTE_URI:
+            uri = config.GEMEENTE_URI[candidate]
+            zoekterm = candidate
+            break
 
-    zoekterm = m.group(1).lower().strip()
-    uri = GEMEENTE_URI.get(zoekterm)
     if not uri:
-        logger.debug("Gemeente '%s' niet gevonden in mapping", zoekterm)
+        logger.debug("Geen van de zoektermen %s gevonden in gemeentemapping", zoektermen)
         return query
 
     logger.info("Gemeente '%s' genormaliseerd naar URI: %s", zoekterm, uri)
 
-    # Verwijder de gemeentenaam triple en FILTER
+    # Verwijder de gemeentenaam triple en de gevonden FILTER regel
     lines = query.split("\n")
     lines = [l for l in lines if not ("gemeentenaam" in l.lower() and "filter" not in l.lower())]
-    lines = [l for l in lines if not ("FILTER" in l and "gemeente" in l.lower())]
+    lines = [l for l in lines if filter_match.group(0) not in l]
     query = "\n".join(lines)
 
     # Vervang heeftBRKRelatie pad door heeftGemeente met directe URI
@@ -419,6 +450,7 @@ def postprocess(query: str, mode: str, question: str = "") -> str:
     query = add_geometry_optional(query)
     query = normalize_gezicht_uri(query)
     query = normalize_gemeente_uri(query)
+    query = remove_empty_optional(query)
     query = fix_provincie_pad(query)
     query = normalize_provincie_uri(query)
     query = add_gezicht_wkt(query)

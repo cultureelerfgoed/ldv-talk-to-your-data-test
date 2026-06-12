@@ -896,6 +896,15 @@
     gap: 0.5rem;
     margin-bottom: 0.75rem;
   }
+  .wkt-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-style: italic;
+    background: var(--paper-2, #f4f1ec);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+  }
   .limit-warning::before { content: "\26A0"; font-size: 1rem; }
 
   .leaflet-popup-content {
@@ -1057,7 +1066,7 @@
         <div class="eyebrow">Experimentele erfgoedzoeker</div>
         <h2>Stel een vraag over <em>cultureel erfgoed</em> in gewone taal.</h2>
         <p>
-          Deze assistent vertaalt jouw vraag naar SPARQL, bevraagt de <a href="https://linkeddata.cultureelerfgoed.nl/rce/cho/" target="_blank" rel="noopener">linked data van de Rijksdienst voor het Cultureel Erfgoed</a> en vat de resultaten samen. De app is bedoeld als testomgeving. Controleer belangrijke antwoorden altijd in de brondata.
+          Deze assistent vertaalt jouw vraag naar SPARQL, bevraagt de linked data van de Rijksdienst voor het Cultureel Erfgoed en vat de resultaten samen. De app is bedoeld als testomgeving. Controleer belangrijke antwoorden altijd in de brondata.
         </p>
       </div>
 
@@ -1411,6 +1420,14 @@ function formatValue(val) {
     return `<a href="${escapeHTML(v)}" target="_blank" rel="noopener" title="${escapeHTML(v)}">${escapeHTML(short)}</a>`;
   }
 
+  // Herken WKT-geometrie en toon compact in plaats van de volledige coördinatenlijst
+  const wktMatch = v.match(/^(?:<[^>]+>\s*)?(POINT|MULTIPOINT|LINESTRING|MULTILINESTRING|POLYGON|MULTIPOLYGON)\s*\(/i);
+  if (wktMatch) {
+    const type = wktMatch[1].toUpperCase();
+    const puntenAantal = (v.match(/-?\d+\.\d+\s+-?\d+\.\d+/g) || []).length;
+    return `<span class="wkt-badge" title="${escapeHTML(v.slice(0, 500))}">${type} (${puntenAantal} ${puntenAantal === 1 ? 'punt' : 'punten'}) — zie kaart</span>`;
+  }
+
   const shown = v.length > 180 ? v.slice(0, 180) + '…' : v;
   return escapeHTML(shown);
 }
@@ -1422,10 +1439,14 @@ function chooseTitle(row, vars) {
     if (row[key] && row[key].value) return row[key].value;
   }
 
+  const geometryVars = findGeometryVars(vars);
   for (const key of vars) {
-    if (row[key] && row[key].value && !String(row[key].value).startsWith('http')) {
-      return row[key].value;
-    }
+    if (geometryVars.includes(key)) continue;
+    const val = row[key] && row[key].value;
+    if (!val || String(val).startsWith('http')) continue;
+    // Sla WKT-achtige waarden over, ook als de variabelenaam niet als geometrie herkend is
+    if (/^(?:<[^>]+>\s*)?(POINT|MULTIPOINT|LINESTRING|MULTILINESTRING|POLYGON|MULTIPOLYGON)\s*\(/i.test(val)) continue;
+    return val;
   }
 
   return 'Resultaat';
