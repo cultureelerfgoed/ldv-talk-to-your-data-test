@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RCE Erfgoed Assistent</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 
@@ -1146,6 +1148,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 const API = window.location.origin + '/api';
 
@@ -1850,7 +1853,30 @@ function initResultMap(bindings, vars) {
   const geometryVars = findGeometryVars(vars);
   const contextVars = geometryVars.filter(v => isContextGeometryVar(v, geometryVars));
   const mainVars = geometryVars.filter(v => !isContextGeometryVar(v, geometryVars));
-  const group = L.featureGroup().addTo(currentMap);
+
+  // Context-geometrie (zoals een Gezicht) clustert NOOIT en blijft altijd
+  // als volledige contour zichtbaar, ongeacht zoomniveau.
+  const contextGroup = L.featureGroup().addTo(currentMap);
+
+  // Hoofdobjecten (rijksmonumenten, archeologische onderzoeksgebieden,
+  // werelderfgoed, etc. -- elk objecttype dat als markers/polygonen wordt
+  // getoond) clusteren WEL bij uitzoomen, zodat honderden losse markers
+  // niet de kaart onleesbaar maken. Geldt voor alle hoofdobjecttypen, niet
+  // alleen rijksmonumenten. Val terug op een gewone featureGroup als de
+  // markercluster-library om een of andere reden niet geladen is, zodat de
+  // kaart blijft werken (zonder clustering) in plaats van te crashen.
+  const clusterGroup = (typeof L.markerClusterGroup === 'function')
+    ? L.markerClusterGroup({
+        maxClusterRadius: 40,
+        disableClusteringAtZoom: 14,
+        chunkedLoading: true,
+      }).addTo(currentMap)
+    : L.featureGroup().addTo(currentMap);
+
+  // Niet-marker hoofdobject-lagen (zoals losse polygonen die geen marker
+  // worden, bijv. bij POLYGON-only resultaten zonder puntvariant) gaan in
+  // een gewone featureGroup, want markerClusterGroup clustert alleen markers.
+  const mainPolygonGroup = L.featureGroup().addTo(currentMap);
 
   // STAP 1: teken elke context-geometrie (zoals een Gezicht) maar EENMAAL,
   // ook als dezelfde waarde in meerdere rijen voorkomt (bijv. 3 rijksmonumenten
@@ -1886,7 +1912,7 @@ function initResultMap(bindings, vars) {
       layers.forEach(layer => {
         styleLayerByVar(layer, v, geometryVars);
         // Geen bindPopup gebeurd als popup leeg is (zie maybeBindPopup in parseWktToLayers)
-        layer.addTo(group);
+        layer.addTo(contextGroup);
       });
     });
   });
@@ -1902,12 +1928,37 @@ function initResultMap(bindings, vars) {
       layers.forEach(layer => styleLayerByVar(layer, v, geometryVars));
 
       const finalLayers = layersToMarkerIfMonument(layers, v, popupHtml, geometryVars, currentMap);
-      finalLayers.forEach(l => l.addTo(group));
+      finalLayers.forEach(l => {
+        // Markers (punten, of samengevoegde polygoon-tot-marker conversies)
+        // gaan in de clustergroep; losse polygoon-lagen die GEEN marker zijn
+        // geworden (zou zeldzaam zijn, maar kan voorkomen) gaan in de gewone
+        // featureGroup zodat ze niet verloren gaan.
+        if (l.getLatLng) {
+          clusterGroup.addLayer(l);
+        } else {
+          l.addTo(mainPolygonGroup);
+        }
+      });
     });
   });
 
-  if (group.getLayers().length) {
-    currentMap.fitBounds(group.getBounds(), {
+  // fitBounds moet rekening houden met ALLE zichtbare content: de
+  // geclusterde markers, eventuele losse hoofdobject-polygonen, en de
+  // context-geometrie (gezicht). De verborgen detail-polygonen (toegevoegd
+  // aan currentMap maar met opacity 0) tellen hier bewust NIET in mee.
+  const boundsGroups = [contextGroup, mainPolygonGroup];
+  let combinedBounds = null;
+  boundsGroups.forEach(g => {
+    if (g.getLayers().length) {
+      combinedBounds = combinedBounds ? combinedBounds.extend(g.getBounds()) : g.getBounds();
+    }
+  });
+  if (clusterGroup.getLayers().length) {
+    combinedBounds = combinedBounds ? combinedBounds.extend(clusterGroup.getBounds()) : clusterGroup.getBounds();
+  }
+
+  if (combinedBounds && combinedBounds.isValid()) {
+    currentMap.fitBounds(combinedBounds, {
       padding: [30, 30],
       maxZoom: 15,
     });

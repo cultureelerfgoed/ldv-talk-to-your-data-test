@@ -248,12 +248,9 @@ def add_gemeente_voorfilter_bij_gezicht(query: str) -> str:
     (een gezicht heeft niet altijd dezelfde naam als zijn gemeente, bijv.
     "Riel" hoort niet bij de gemeente "Riel").
     """
-    print("DEBUG add_gemeente_voorfilter_bij_gezicht: functie aangeroepen")
     if "Rijksmonument" not in query:
-        print("DEBUG: geen Rijksmonument in query, skip")
         return query
     if not re.search(r"sfWithin|sfIntersects", query):
-        print("DEBUG: geen sfWithin/sfIntersects in query, skip")
         return query
 
     # Verwijder altijd eerst elk ONGEBONDEN gemeente-patroon waarbij het subject
@@ -286,12 +283,9 @@ def add_gemeente_voorfilter_bij_gezicht(query: str) -> str:
         return query
 
     gezicht_uri = gezicht_match.group(1)
-    print(f"DEBUG add_gemeente_voorfilter_bij_gezicht: gezicht_match gevonden, gezicht_uri={gezicht_uri}")
     gemeente_uri = sparql_executor.get_gemeente_voor_gezicht(gezicht_uri)
-    print(f"DEBUG add_gemeente_voorfilter_bij_gezicht: gemeente_uri={gemeente_uri}")
     if not gemeente_uri:
         logger.warning("Kon geen gemeente afleiden voor gezicht %s — query blijft ongewijzigd (mogelijk timeout)", gezicht_uri)
-        print(f"DEBUG: GEEN gemeente gevonden, query blijft ongewijzigd!")
         return query
 
     logger.info("Gemeente-voorfilter automatisch afgeleid voor gezicht %s: %s", gezicht_uri, gemeente_uri)
