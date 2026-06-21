@@ -1635,6 +1635,7 @@ function unwrapParens(value) {
 }
 
 function parseWktToLayers(rawWkt, popupHtml) {
+  const maybeBindPopup = (layer) => popupHtml ? layer.bindPopup(popupHtml) : layer;
   const wkt = stripCrsFromWkt(rawWkt);
   const typeMatch = wkt.match(/^([A-Z]+)\s*\((.*)\)$/i);
 
@@ -1646,7 +1647,7 @@ function parseWktToLayers(rawWkt, popupHtml) {
 
   if (type === 'POINT') {
     const latlng = coordToLatLng(body);
-    if (latlng) layers.push(L.marker(latlng).bindPopup(popupHtml));
+    if (latlng) layers.push(maybeBindPopup(L.marker(latlng)));
   }
 
   if (type === 'MULTIPOINT') {
@@ -1654,13 +1655,13 @@ function parseWktToLayers(rawWkt, popupHtml) {
 
     points.forEach(point => {
       const latlng = coordToLatLng(unwrapParens(point));
-      if (latlng) layers.push(L.marker(latlng).bindPopup(popupHtml));
+      if (latlng) layers.push(maybeBindPopup(L.marker(latlng)));
     });
   }
 
   if (type === 'LINESTRING') {
     const line = parseCoordList(body);
-    if (line.length) layers.push(L.polyline(line).bindPopup(popupHtml));
+    if (line.length) layers.push(maybeBindPopup(L.polyline(line)));
   }
 
   if (type === 'MULTILINESTRING') {
@@ -1668,25 +1669,39 @@ function parseWktToLayers(rawWkt, popupHtml) {
 
     lines.forEach(lineRaw => {
       const line = parseCoordList(unwrapParens(lineRaw));
-      if (line.length) layers.push(L.polyline(line).bindPopup(popupHtml));
+      if (line.length) layers.push(maybeBindPopup(L.polyline(line)));
     });
   }
 
   if (type === 'POLYGON') {
+    // body ziet er hier uit als "(ring1),(ring2),..." -- elke ring is zelf
+    // al "(p1,p2,p3,...)" en mag maar EENMAAL van zijn buitenste haakjes
+    // ontdaan worden, niet herhaaldelijk (anders valt de ring-structuur weg
+    // en wordt elke COORDINAAT als losse "ring" gezien).
     const rings = splitTopLevel(body);
-    const latlngs = rings.map(ring => parseCoordList(unwrapParens(ring))).filter(r => r.length);
+    const latlngs = rings
+      .map(ring => parseCoordList(ring.trim().replace(/^\(/, '').replace(/\)$/, '')))
+      .filter(r => r.length);
 
-    if (latlngs.length) layers.push(L.polygon(latlngs).bindPopup(popupHtml));
+    if (latlngs.length) layers.push(maybeBindPopup(L.polygon(latlngs)));
   }
 
   if (type === 'MULTIPOLYGON') {
+    // body ziet er hier uit als "((ring1),(ring2)),((ring1)),..." -- elk
+    // top-level deel is een polygoon-component die zelf weer 1+ rings
+    // bevat. Pel hier EENMAAL de buitenste haakjes van het polygoon-component
+    // af (niet recursief tot op het kale coordinatenniveau), en behandel
+    // de overgebleven rings net als bij POLYGON hierboven.
     const polygons = splitTopLevel(body);
 
     polygons.forEach(polyRaw => {
-      const rings = splitTopLevel(unwrapParens(polyRaw));
-      const latlngs = rings.map(ring => parseCoordList(unwrapParens(ring))).filter(r => r.length);
+      const polyBody = polyRaw.trim().replace(/^\(/, '').replace(/\)$/, '');
+      const rings = splitTopLevel(polyBody);
+      const latlngs = rings
+        .map(ring => parseCoordList(ring.trim().replace(/^\(/, '').replace(/\)$/, '')))
+        .filter(r => r.length);
 
-      if (latlngs.length) layers.push(L.polygon(latlngs).bindPopup(popupHtml));
+      if (latlngs.length) layers.push(maybeBindPopup(L.polygon(latlngs)));
     });
   }
 
@@ -1733,56 +1748,85 @@ function renderMapCard(bindings, vars) {
   `;
 }
 
-function styleLayerByVar(layer, geometryVar) {
+function isContextGeometryVar(geometryVar, allGeometryVars) {
+  // De "context"-geometrie (zoals een Gezicht) is altijd dunner/transparanter
+  // gestyled dan het hoofdobject. Als er meerdere geometrie-variabelen zijn,
+  // is elke variabele die "gezicht" in de naam heeft de context-laag; als er
+  // maar EEN geometrie-variabele is, is die altijd het hoofdobject (geen context).
   const name = String(geometryVar || '').toLowerCase();
+  if (allGeometryVars.length <= 1) return false;
+  return name.includes('gezicht') || name.includes('gez');
+}
 
+function styleLayerByVar(layer, geometryVar, allGeometryVars) {
   if (!layer.setStyle) return;
 
-  if (name.includes('rm')) {
+  if (isContextGeometryVar(geometryVar, allGeometryVars || [geometryVar])) {
     layer.setStyle({
-      weight: 2,
-      opacity: 1,
-      fillOpacity: 0.45
-    });
-    return;
-  }
-
-  if (name.includes('gezicht') || name.includes('gez') || name === 'wkt') {
-    layer.setStyle({
-      weight: 2,
-      opacity: 0.85,
-      fillOpacity: 0.12
+      weight: 3,
+      opacity: 0.9,
+      fillOpacity: 0.08,
+      color: '#d32f2f'
     });
     return;
   }
 
   layer.setStyle({
     weight: 2,
-    opacity: 0.9,
-    fillOpacity: 0.25
+    opacity: 1,
+    fillOpacity: 0.45
   });
 }
 
-function layerToMarkerIfMonument(layer, geometryVar, popupHtml) {
-  const name = String(geometryVar || '').toLowerCase();
-
-  if (!name.includes('rm')) return layer;
-
-  if (layer.getLatLng) {
-    return layer;
+function layersToMarkerIfMonument(layers, geometryVar, popupHtml, allGeometryVars, detailMap) {
+  // Het hoofdobject (niet de context-geometrie zoals een gezicht) wordt
+  // getoond als EEN marker voor overzicht, ook als de onderliggende WKT uit
+  // meerdere losse polygonen bestaat (bijv. een MULTIPOLYGON met 3 delen
+  // voor 1 rijksmonument-complex) -- die horen bij elkaar en mogen niet
+  // als 3 losse markers verschijnen. De exacte contouren worden op de kaart
+  // gezet maar standaard verborgen; een klik op de marker toont ze alle.
+  if (isContextGeometryVar(geometryVar, allGeometryVars || [geometryVar])) {
+    return layers;
   }
 
-  if (layer.getBounds) {
-    const center = layer.getBounds().getCenter();
-    return L.circleMarker(center, {
-      radius: 6,
-      weight: 2,
-      opacity: 1,
-      fillOpacity: 0.9
-    }).bindPopup(popupHtml);
+  // Layers die al markers/punten zijn (POINT/MULTIPOINT) blijven ongewijzigd
+  const pointLayers = layers.filter(l => l.getLatLng);
+  const polygonLayers = layers.filter(l => l.getBounds && !l.getLatLng);
+
+  if (!polygonLayers.length) {
+    return layers; // niets te combineren, alleen punten
   }
 
-  return layer;
+  // Bereken het gezamenlijke middelpunt van ALLE polygoon-delen samen
+  let combinedBounds = polygonLayers[0].getBounds();
+  polygonLayers.slice(1).forEach(l => {
+    combinedBounds = combinedBounds.extend(l.getBounds());
+  });
+  const center = combinedBounds.getCenter();
+
+  polygonLayers.forEach(layer => {
+    layer.setStyle({ weight: 2, opacity: 0, fillOpacity: 0 });
+    if (detailMap) layer.addTo(detailMap);
+  });
+
+  const marker = L.circleMarker(center, {
+    radius: 6,
+    weight: 2,
+    opacity: 1,
+    fillOpacity: 0.9
+  }).bindPopup(popupHtml);
+
+  let revealed = false;
+  marker.on('click', () => {
+    if (!revealed) {
+      polygonLayers.forEach(layer => {
+        layer.setStyle({ weight: 2, opacity: 0.9, fillOpacity: 0.35 });
+      });
+      revealed = true;
+    }
+  });
+
+  return [...pointLayers, marker];
 }
 
 function initResultMap(bindings, vars) {
@@ -1804,22 +1848,61 @@ function initResultMap(bindings, vars) {
   }).addTo(currentMap);
 
   const geometryVars = findGeometryVars(vars);
+  const contextVars = geometryVars.filter(v => isContextGeometryVar(v, geometryVars));
+  const mainVars = geometryVars.filter(v => !isContextGeometryVar(v, geometryVars));
   const group = L.featureGroup().addTo(currentMap);
 
+  // STAP 1: teken elke context-geometrie (zoals een Gezicht) maar EENMAAL,
+  // ook als dezelfde waarde in meerdere rijen voorkomt (bijv. 3 rijksmonumenten
+  // die allemaal hetzelfde gezicht delen) -- anders ontstaan er meerdere
+  // overlappende kopieen die elkaars klik-events kunnen verstoren.
+  //
+  // De context-geometrie krijgt ALLEEN een klikbare popup als er GEEN
+  // hoofdobject (bijv. ?rm) in de resultaten zit -- d.w.z. als het Gezicht
+  // zelf het onderwerp van de vraag is, niet slechts een ruimtelijk filter
+  // ("welke RM liggen in gezicht X" -> geen gezicht-popup nodig/gewenst;
+  // "geef me dit gezicht" -> wel een popup gewenst).
+  const heeftHoofdobject = mainVars.length > 0;
+
+  contextVars.forEach(v => {
+    const seenValues = new Set();
+    bindings.forEach(row => {
+      if (!row[v] || !row[v].value) return;
+      const val = row[v].value;
+      if (seenValues.has(val)) return;
+      seenValues.add(val);
+
+      let popup = null;
+      if (!heeftHoofdobject) {
+        const gezichtNaamVeld = vars.find(k =>
+          k !== v && k.toLowerCase().includes('gezicht') &&
+          row[k] && row[k].value && !String(row[k].value).startsWith('http') &&
+          !/^(?:<[^>]+>\s*)?(POINT|POLYGON|MULTIPOLYGON)/i.test(row[k].value)
+        );
+        popup = `<strong>Beschermd gezicht</strong>${gezichtNaamVeld ? '<br>' + escapeHTML(row[gezichtNaamVeld].value) : ''}`;
+      }
+
+      const layers = parseWktToLayers(val, popup || '');
+      layers.forEach(layer => {
+        styleLayerByVar(layer, v, geometryVars);
+        // Geen bindPopup gebeurd als popup leeg is (zie maybeBindPopup in parseWktToLayers)
+        layer.addTo(group);
+      });
+    });
+  });
+
+  // STAP 2: teken elk hoofdobject (rijksmonument) per rij, zoals voorheen.
   bindings.forEach(row => {
     const popupHtml = popupForRow(row, vars);
 
-    geometryVars.forEach(v => {
+    mainVars.forEach(v => {
       if (!row[v] || !row[v].value) return;
 
       const layers = parseWktToLayers(row[v].value, popupHtml);
+      layers.forEach(layer => styleLayerByVar(layer, v, geometryVars));
 
-      layers.forEach(layer => {
-        styleLayerByVar(layer, v);
-
-        const finalLayer = layerToMarkerIfMonument(layer, v, popupHtml);
-        finalLayer.addTo(group);
-      });
+      const finalLayers = layersToMarkerIfMonument(layers, v, popupHtml, geometryVars, currentMap);
+      finalLayers.forEach(l => l.addTo(group));
     });
   });
 

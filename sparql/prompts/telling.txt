@@ -7,6 +7,29 @@ Dit geldt voor:
 - sfWithin of sfIntersects waarbij de archeologische dataset niet op woonplaats of gemeente gefilterd kan worden
 - Vragen als "welke archeologische gebieden overlappen met rijksmonumenten in Gelderland/Nederland"
 
+RIJKSMONUMENT EN ARCHEOLOGISCH ONDERZOEKSGEBIED KOPPELEN OP KERNNIVEAU
+(snel alternatief voor zware ruimtelijke joins zoals sfIntersects/sfWithin):
+
+Rijksmonumenten en archeologische onderzoeksgebieden hebben BEIDE een kernnaam
+(geen gemeentenaam) beschikbaar:
+- Rijksmonument: ceo:heeftLocatieAanduiding -> ceo:locatienaam
+- ArcheologischOnderzoeksgebied: ceo:heeftBasisregistratieRelatie -> heeftBAGRelatie -> ceo:woonplaatsnaam
+
+Gebruik deze aanpak bij voorkeur over geof:sfIntersects/sfWithin wanneer de vraag een
+specifieke kern of plaatsnaam noemt (niet een hele provincie/gemeente) — dat voorkomt
+timeouts en topologiefouten volledig. Tel het aantal via COUNT(DISTINCT ?onderzoeksgebied)
+of COUNT(DISTINCT ?rm) afhankelijk van wat er gevraagd wordt.
+
+OPPERVLAKTE BIJ WERELDERFGOED EN GEZICHT — gebruik ALTIJD de directe attributen,
+NOOIT een geo-functie/berekening (dat is veel trager):
+
+ceo:Geometrie heeft twee kant-en-klare oppervlaktewaarden (alleen bij Werelderfgoed en Gezicht):
+- ceo:oppervlakteInHectare
+- ceo:oppervlakteInVierkanteKilometers
+
+Voor vergelijkingen (bijv. "hoeveel gezichten zijn groter dan 50 hectare") gebruik je een
+FILTER direct op deze waarde: FILTER(?oppervlakteHa > 50). Gebruik NOOIT geof:area.
+
 RUIMTELIJKE QUERIES — geof:sfWithin is toegestaan maar ALLEEN efficiënt als je eerst filtert:
 VERPLICHTE VOLGORDE bij ruimtelijke queries:
 1. Filter eerst op gemeente of provincie (kleine subset via URI)

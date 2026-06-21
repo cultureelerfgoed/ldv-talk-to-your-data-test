@@ -14,6 +14,7 @@ import re
 import logging
 
 import config
+from sparql import executor as sparql_executor
 from config import SPARQL_PREFIXES, PROVINCIE_URI
 
 CBS_GRAPH = 'https://linkeddata.cultureelerfgoed.nl/rce/cho/graphs/cbs_woonplaatsen'
@@ -143,6 +144,193 @@ def remove_empty_optional(query: str) -> str:
     return re.sub(r'OPTIONAL\s*\{\s*\}', '', query)
 
 
+def remove_unbound_triples(query: str) -> str:
+    """
+    Verwijdert triple-patronen waarvan het SUBJECT nooit ECHT gebonden wordt
+    door de rest van de query. Dit komt voor wanneer het LLM een relatie
+    probeert te volgen die niet bestaat in het datamodel (bijv. de gemeente
+    van een Gezicht rechtstreeks proberen op te halen, of een losse
+    ?gemeenteUri rdfs:label ?gemeente regel zonder dat ?gemeenteUri ergens
+    aan een echte URI of ander triple gekoppeld is). Zo'n patroon maakt de
+    variabele in feite vrij over de HELE dataset, wat een ongerichte join
+    veroorzaakt en timeouts geeft.
+
+    Een variabele is pas ECHT gebonden als ze elders in de query voorkomt
+    als OBJECT van een triple (?iets predicate ?dezeVar), niet alleen als
+    subject van willekeurig veel "lookup"-triples (?dezeVar predicate ?iets).
+    Simpelweg meerdere keren voorkomen als subject is NIET genoeg -- dat
+    betekent alleen dat de variabele meerdere keren wordt gebruikt, niet
+    dat ze ooit een waarde krijgt.
+
+    Alleen toegepast op simpele "?subject predicate ?object ." regels
+    (één triple per regel, geen OPTIONAL/FILTER-blokken) om veilig te blijven.
+    Wordt herhaald tot er niets meer verwijderd wordt, zodat een keten van
+    ongebonden variabelen (A hangt af van B, B hangt af van C, ...) volledig
+    wordt opgeruimd.
+    """
+    def is_bound_as_object(var: str, full_query: str) -> bool:
+        # Zoek of deze variabele ergens voorkomt als OBJECT (laatste deel)
+        # van een triple: "... predicate ?var ." -- dat betekent dat de
+        # variabele daar een waarde toegewezen krijgt.
+        pattern = r"[?\w<>:/#.\-]+\s+[\w:]+\s+" + re.escape(var) + r"\s*\."
+        return bool(re.search(pattern, full_query))
+
+    changed = True
+    while changed:
+        changed = False
+        lines = query.split("\n")
+        kept_lines = []
+
+        for line in lines:
+            m = re.match(r"^\s*([?]\w+)\s+[\w:]+\s+[?]\w+\s*\.\s*$", line)
+            if not m:
+                kept_lines.append(line)
+                continue
+
+            subject_var = m.group(1)
+            rest_of_query = query.replace(line, "", 1)
+
+            if not is_bound_as_object(subject_var, rest_of_query) and subject_var != "?rm" and subject_var != "?gezicht":
+                logger.info("Ongebonden triple verwijderd: %s", line.strip())
+                changed = True
+                continue  # regel overslaan = verwijderen
+
+            kept_lines.append(line)
+
+        query = "\n".join(kept_lines)
+
+    return query
+
+
+def wrap_risky_gezicht_naam_in_optional(query: str) -> str:
+    """
+    Een veelvoorkomende LLM-fout: "?gezicht rdfs:label ?gezichtNaam ." als
+    VERPLICHTE (niet-OPTIONAL) triple. ceo:Gezicht heeft geen rdfs:label,
+    dus dit veroorzaakt 0 resultaten zonder duidelijke foutmelding -- de
+    rest van de query kan prima kloppen. Wrap dit patroon altijd in OPTIONAL,
+    of verwijder het volledig als de gevonden naam toch nergens gebruikt wordt
+    (bijv. niet in de SELECT).
+    """
+    pattern = r"^(\s*)([?]gezicht)\s+rdfs:label\s+([?]\w+)\s*\.\s*$"
+    m = re.search(pattern, query, re.MULTILINE)
+    if not m:
+        return query
+
+    var_name = m.group(3)
+    indent = m.group(1)
+
+    if var_name in re.findall(r"SELECT\s+(?:DISTINCT\s+)?((?:[?]\w+\s*)+)", query, re.IGNORECASE)[0] if re.findall(r"SELECT\s+(?:DISTINCT\s+)?((?:[?]\w+\s*)+)", query, re.IGNORECASE) else False:
+        # De naam wordt getoond in de resultaten -- gebruik het juiste pad
+        # binnen een OPTIONAL, niet rdfs:label
+        replacement = (
+            f"{indent}OPTIONAL {{ ?gezicht ceo:heeftNaam ?gezichtNaamObj . "
+            f"?gezichtNaamObj ceo:naam {var_name} . }}"
+        )
+    else:
+        # De naam wordt nergens gebruikt -- regel kan gewoon weg
+        replacement = ""
+
+    logger.info("Risicovolle ?gezicht rdfs:label triple herschreven/verwijderd")
+    query = re.sub(pattern, replacement, query, count=1, flags=re.MULTILINE)
+    return query
+
+
+def add_gemeente_voorfilter_bij_gezicht(query: str) -> str:
+    """
+    Als een gezicht-URI is opgelost (FILTER ?gezicht = ... of IN (...)) en de
+    query een ruimtelijke join (sfWithin/sfIntersects) met Rijksmonument
+    bevat, maar nog GEEN gemeente-voorfilter heeft op het rijksmonument
+    (?rm heeftBasisregistratieRelatie -> heeftGemeente), leidt dan de
+    gemeente automatisch af (via één representatief rijksmonument binnen
+    het gezicht) en voeg die toe als voorfilter. Dit voorkomt de timeout
+    die ontstaat als sfWithin alle rijksmonumenten in Nederland moet scannen,
+    en is robuuster dan vertrouwen op het LLM om de juiste gemeente te raden
+    (een gezicht heeft niet altijd dezelfde naam als zijn gemeente, bijv.
+    "Riel" hoort niet bij de gemeente "Riel").
+    """
+    print("DEBUG add_gemeente_voorfilter_bij_gezicht: functie aangeroepen")
+    if "Rijksmonument" not in query:
+        print("DEBUG: geen Rijksmonument in query, skip")
+        return query
+    if not re.search(r"sfWithin|sfIntersects", query):
+        print("DEBUG: geen sfWithin/sfIntersects in query, skip")
+        return query
+
+    # Verwijder altijd eerst elk ONGEBONDEN gemeente-patroon waarbij het subject
+    # nergens anders in de query gedefinieerd wordt (typisch: het LLM probeert de
+    # gemeente van het GEZICHT zelf af te leiden via een niet-bestaande relatie,
+    # zoals "?gezichtRelatie ceo:heeftGemeente ?gemeenteUri ." — dit subject komt
+    # nergens anders voor en maakt de variabele in feite vrij over de hele dataset,
+    # wat een ongerichte join over alle gemeenten veroorzaakt).
+    for m in list(re.finditer(r"^\s*([?]\w+)\s+ceo:heeftGemeente\s+([?]\w+)\s*\.\s*$", query, re.MULTILINE)):
+        subject_var = m.group(1)
+        # Is dit subject ergens ANDERS in de query gedefinieerd (bijv. via
+        # heeftBasisregistratieRelatie)? Zo niet, is het een los/ongebonden patroon.
+        other_occurrences = re.findall(re.escape(subject_var) + r"\b", query)
+        if len(other_occurrences) <= 1:
+            query = query.replace(m.group(0), "")
+
+    gezicht_match = re.search(
+        r"FILTER\s*\(\s*\?gezicht\s*=\s*<([^>]+)>\s*\)",
+        query,
+        re.IGNORECASE,
+    )
+    if not gezicht_match:
+        # Probeer ook de IN(...)-vorm en pak de eerste URI als representatief
+        gezicht_match = re.search(
+            r"FILTER\s*\(\s*\?gezicht\s+IN\s*\(\s*<([^>]+)>",
+            query,
+            re.IGNORECASE,
+        )
+    if not gezicht_match:
+        return query
+
+    gezicht_uri = gezicht_match.group(1)
+    print(f"DEBUG add_gemeente_voorfilter_bij_gezicht: gezicht_match gevonden, gezicht_uri={gezicht_uri}")
+    gemeente_uri = sparql_executor.get_gemeente_voor_gezicht(gezicht_uri)
+    print(f"DEBUG add_gemeente_voorfilter_bij_gezicht: gemeente_uri={gemeente_uri}")
+    if not gemeente_uri:
+        logger.warning("Kon geen gemeente afleiden voor gezicht %s — query blijft ongewijzigd (mogelijk timeout)", gezicht_uri)
+        print(f"DEBUG: GEEN gemeente gevonden, query blijft ongewijzigd!")
+        return query
+
+    logger.info("Gemeente-voorfilter automatisch afgeleid voor gezicht %s: %s", gezicht_uri, gemeente_uri)
+
+    # Verwijder ALLE bestaande heeftGemeente-regels op het rijksmonument, zowel
+    # met vaste URI als met variabele. Het LLM kan namelijk zelf ook een
+    # (foutieve) gemeente invullen op basis van de gezichtnaam (bijv. "Riel"
+    # -> gokt op gemeente Goirle, terwijl dit specifieke gezicht in Eindhoven
+    # ligt) — dus elke bestaande filter wordt altijd vervangen door de
+    # betrouwbaar afgeleide versie, nooit naast elkaar behouden.
+    query = re.sub(
+        r"^\s*[?]\w+\s+ceo:heeftGemeente\s+(?:[?]\w+|<[^>]+>)\s*\.\s*$\n?",
+        "",
+        query,
+        flags=re.MULTILINE,
+    )
+    # Verwijder ook losse heeftBasisregistratieRelatie-regels die uitsluitend
+    # voor de (nu verwijderde) gemeente-relatie bedoeld waren en nergens anders
+    # meer voor gebruikt worden, om duplicaten te voorkomen.
+    query = re.sub(
+        r"^\s*[?]rm\s+ceo:heeftBasisregistratieRelatie\s+[?]\w*[Gg]emeente\w*\s*\.\s*$\n?",
+        "",
+        query,
+        flags=re.MULTILINE,
+    )
+
+    # Voeg het voorfilter toe direct na de eerste ?rm a ceo:Rijksmonument . regel
+    query = re.sub(
+        r"([?]rm\s+a\s+ceo:Rijksmonument\s*\.)",
+        lambda m: m.group(0) +
+                  f"\n  ?rm ceo:heeftBasisregistratieRelatie ?gemeenteVoorfilterBrr .\n"
+                  f"  ?gemeenteVoorfilterBrr ceo:heeftGemeente <{gemeente_uri}> .",
+        query,
+        count=1,
+    )
+
+    return query
+
+
 def normalize_gemeente_uri(query: str) -> str:
     """
     Vervang gemeente-filterpad door een directe URI match.
@@ -159,20 +347,21 @@ def normalize_gemeente_uri(query: str) -> str:
         return query
 
     # Als de gezicht-URI al is opgelost (normalize_gezicht_uri), is de locatie
-    # al bepaald. ceo:Gezicht heeft geen heeftBasisregistratieRelatie, dus
-    # een eventuele (foutieve) gemeentefilter op ?gezicht moet verwijderd worden.
+    # van het GEZICHT al bepaald. ceo:Gezicht heeft geen heeftBasisregistratieRelatie,
+    # dus een eventuele (foutieve) gemeentefilter DIRECT OP ?gezicht moet verwijderd worden.
+    # De query loopt daarna gewoon door, want het rijksmonument heeft nog steeds
+    # een eigen gemeente-voorfilter nodig (performance) dat WEL genormaliseerd moet worden.
     if re.search(r'FILTER\s*\(\s*\?gezicht\s*(=|IN\b)', query, re.IGNORECASE):
         lines = query.split("\n")
         cleaned = []
-        skip_next_empty_optional = False
         for l in lines:
-            if "?gezicht" in l and ("heeftBasisregistratieRelatie" in l or "heeftGemeente" in l):
-                continue
-            if re.match(r'^\s*\?\w+\s+ceo:heeftGemeente\s+<[^>]+>\s*\.\s*$', l) and "?brr" in l:
+            # Alleen regels waar ?gezicht zelf het subject is van de gemeente-relatie
+            if re.match(r'^\s*\?gezicht\s+ceo:(heeftBasisregistratieRelatie|heeftGemeente)\b', l):
                 continue
             cleaned.append(l)
         query = "\n".join(cleaned)
-        return query
+        # GEEN return hier — ga door naar de normale ?rm gemeentenormalisatie hieronder
+
     if not config.GEMEENTE_URI:
         return query  # mapping nog niet geladen, laat query ongewijzigd
 
@@ -298,6 +487,163 @@ def add_geometry_optional(query: str) -> str:
                   " ceo:heeftGeometrie ?geom . ?geom geo:asWKT ?wkt . }",
         query,
         count=1,
+    )
+
+    return query
+
+
+def fix_rijksmonument_woonplaats_pad(query: str) -> str:
+    """
+    Als de query ceo:woonplaatsnaam gebruikt voor een Rijksmonument (geeft de
+    GEMEENTENAAM terug, niet de kern), en de zoekterm matcht NIET op de
+    GEMEENTE_URI mapping, dan is het waarschijnlijk een kernnaam (zoals
+    "Werkhoven" binnen gemeente Bunnik). Herschrijf dan naar het
+    heeftLocatieAanduiding -> locatienaam pad, dat wel kernnamen bevat.
+    """
+    if "Rijksmonument" not in query:
+        return query
+    if "ArcheologischOnderzoeksgebied" in query:
+        return query
+    if "woonplaatsnaam" not in query:
+        return query
+
+    filter_match = None
+    for fm in re.finditer(r'FILTER\s*\([^\n]*\)', query, re.IGNORECASE):
+        if "woonplaats" in fm.group(0).lower():
+            filter_match = fm
+            break
+    if not filter_match:
+        return query
+
+    zoektermen = re.findall(r'"([^"]+)"', filter_match.group(0))
+    if not zoektermen:
+        return query
+    zoekterm = zoektermen[0]
+
+    # Als de zoekterm WEL een bekende gemeentenaam is, laat de query ongewijzigd
+    # (normalize_gemeente_uri handelt dat geval al af)
+    if zoekterm.lower().strip() in config.GEMEENTE_URI:
+        return query
+
+    logger.info(
+        "Woonplaatsnaam '%s' is geen bekende gemeente — herschrijf naar locatienaam-pad",
+        zoekterm,
+    )
+
+    # Verwijder de oude heeftBAGRelatie/woonplaatsnaam regels en de FILTER
+    lines = query.split("\n")
+    cleaned = []
+    bag_var = None
+    for l in lines:
+        m = re.match(r'^\s*[?]\w+\s+ceo:heeftBAGRelatie\s+([?]\w+)\s*\.', l)
+        if m:
+            bag_var = m.group(1)
+            continue
+        if bag_var and f"{bag_var} ceo:woonplaatsnaam" in l:
+            continue
+        if filter_match.group(0) in l:
+            continue
+        cleaned.append(l)
+    query = "\n".join(cleaned)
+
+    # Voeg het locatienaam-pad toe na heeftBasisregistratieRelatie
+    query = re.sub(
+        r"([?]\w+\s+ceo:heeftBasisregistratieRelatie\s+[?]\w+\s*\.)",
+        lambda m: m.group(1) +
+                  f'\n  ?rm ceo:heeftLocatieAanduiding ?locatie . ?locatie ceo:locatienaam ?locatienaam .'
+                  f'\n  FILTER(CONTAINS(LCASE(?locatienaam), "{zoekterm.lower()}"))',
+        query,
+        count=1,
+    )
+
+    return query
+
+
+def add_gemeente_context_bij_locatienaam(query: str) -> str:
+    """
+    Als de query ceo:locatienaam gebruikt (kernnaam-zoekopdracht) maar nog geen
+    gemeente bevat, voeg de gemeentenaam toe als extra context zodat de gebruiker
+    ziet in welke gemeente de kern ligt. Gebruikt de OFFICIËLE heeftGemeente-URI
+    (via rdfs:label), NIET ceo:gemeentenaam via BRK (die kan afwijkende waarden geven).
+    """
+    if "locatienaam" not in query:
+        return query
+
+    # Zorg dat ?locatienaam zelf altijd in de SELECT staat, ook als het LLM
+    # die alleen in de FILTER gebruikte
+    select_match = re.search(r"SELECT\s+(?:DISTINCT\s+)?(?:\?\w+\s*)+", query, re.IGNORECASE)
+    if select_match and "?locatienaam" not in select_match.group(0):
+        query = re.sub(
+            r"(SELECT\s+(?:DISTINCT\s+)?)((?:\?\w+\s*)+)",
+            lambda m: m.group(1) + m.group(2).rstrip() + " ?locatienaam ",
+            query,
+            count=1,
+        )
+
+    if "heeftGemeente" in query:
+        return query
+
+    if "PREFIX rdfs:" not in query:
+        query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" + query
+
+    # Voeg ?gemeente toe aan de SELECT
+    query = re.sub(
+        r"(SELECT\s+(?:DISTINCT\s+)?)((?:\?\w+\s*)+)",
+        lambda m: m.group(1) + m.group(2).rstrip() + " ?gemeente ",
+        query,
+        count=1,
+    )
+
+    # Voeg de OPTIONAL toe na de locatienaam-FILTER regel.
+    # FILTER(!CONTAINS(?gemeente, "'")) sluit de archaïsche apostrof-variant uit
+    # (zoals "'s-Gravenhage" naast "Den Haag") zodat er geen duplicaatrij ontstaat
+    # voor hetzelfde monument met twee verschillende gemeentelabels.
+    query = re.sub(
+        r'(FILTER\s*\(\s*CONTAINS\s*\(\s*LCASE\s*\(\s*\?locatienaam\s*\)[^)]*\)\s*\))',
+        lambda m: m.group(0) +
+                  "\n  OPTIONAL {\n"
+                  "    ?rm ceo:heeftBasisregistratieRelatie ?relatieGemeente .\n"
+                  "    ?relatieGemeente ceo:heeftGemeente ?gemeenteUri .\n"
+                  "    ?gemeenteUri rdfs:label ?gemeente .\n"
+                  "    FILTER(!CONTAINS(?gemeente, \"'\"))\n"
+                  "  }",
+        query,
+        count=1,
+    )
+
+    return query
+
+
+def fix_optional_geometry_in_spatial_filter(query: str) -> str:
+    """
+    Als een geometrievariabele (bijv. ?wkt) binnen een OPTIONAL staat maar WEL
+    gebruikt wordt in een geof:sfWithin/sfIntersects FILTER, maak die regel dan
+    verplicht. Een ruimtelijke FILTER op een ongebonden variabele faalt altijd,
+    wat tot 0 resultaten leidt ook als er wel matches zouden moeten zijn.
+    """
+    spatial_match = re.search(
+        r"geof:(?:sfWithin|sfIntersects|sfContains|sfOverlaps)\s*\(\s*(\?\w+)\s*,\s*(\?\w+)\s*\)",
+        query,
+    )
+    if not spatial_match:
+        return query
+
+    geo_vars = {spatial_match.group(1), spatial_match.group(2)}
+
+    # Zoek elke OPTIONAL { ... } blok dat een van deze variabelen bindt
+    def maak_verplicht(m):
+        block = m.group(0)
+        binnenkant = m.group(1)
+        # Bevat dit OPTIONAL-blok een binding voor een van de ruimtelijke variabelen?
+        if any(re.search(re.escape(v) + r"\b", binnenkant) for v in geo_vars):
+            logger.info("OPTIONAL rond ruimtelijke geometrie verplicht gemaakt: %s", binnenkant.strip())
+            return binnenkant.strip()
+        return block
+
+    query = re.sub(
+        r"OPTIONAL\s*\{([^{}]*)\}",
+        maak_verplicht,
+        query,
     )
 
     return query
@@ -445,16 +791,24 @@ def postprocess(query: str, mode: str, question: str = "") -> str:
     6. Verwijder LIMIT (als lijst-modus) — altijd als laatste
     """
     query = query.replace("```sparql", "").replace("```", "").strip()
+    query = remove_unbound_triples(query)
+    query = wrap_risky_gezicht_naam_in_optional(query)
     query = inject_prefixes(query)
     query = add_juridische_status_filter(query, question)
     query = add_geometry_optional(query)
+    query = fix_optional_geometry_in_spatial_filter(query)
+    query = fix_rijksmonument_woonplaats_pad(query)
+    query = add_gemeente_context_bij_locatienaam(query)
     query = normalize_gezicht_uri(query)
+    query = add_gemeente_voorfilter_bij_gezicht(query)
     query = normalize_gemeente_uri(query)
     query = remove_empty_optional(query)
     query = fix_provincie_pad(query)
     query = normalize_provincie_uri(query)
     query = add_gezicht_wkt(query)
     query = fix_label_filter(query)
+    query = remove_unbound_triples(query)
+    query = remove_empty_optional(query)
 
     if mode == "lijst":
         query = remove_limit(query)

@@ -10,6 +10,19 @@ OPTIONAL { ?rm ceo:heeftGeometrie ?geom . ?geom geo:asWKT ?wkt . }
 
 Voeg in dat geval ook PREFIX geo: <http://www.opengis.net/ont/geosparql#> toe.
 
+KRITISCHE UITZONDERING: als ?wkt (of een andere geometrievariabele) gebruikt wordt in
+een geof:sfWithin/sfIntersects FILTER, dan moet die geometrie ALTIJD VERPLICHT zijn
+(GEEN OPTIONAL) — een FILTER met een ruimtelijke functie faalt onherroepelijk als de
+variabele niet gebonden is, en geeft dan 0 resultaten voor de hele query.
+
+Fout — wkt optioneel maar wel gebruikt in ruimtelijke FILTER (geeft 0 resultaten):
+OPTIONAL { ?rm ceo:heeftGeometrie ?rmGeom . ?rmGeom geo:asWKT ?wkt . }
+FILTER(geof:sfWithin(?wkt, ?gezichtWkt))
+
+Goed — wkt verplicht omdat het in de ruimtelijke FILTER gebruikt wordt:
+?rm ceo:heeftGeometrie ?rmGeom . ?rmGeom geo:asWKT ?wkt .
+FILTER(geof:sfWithin(?wkt, ?gezichtWkt))
+
 ARCHEOLOGISCHE ONDERZOEKSGEBIEDEN — VERPLICHTE PADSTRUCTUUR:
 ceo:ArcheologischOnderzoeksgebied heeft GEEN heeftBRKRelatie en GEEN heeftGemeente.
 Gebruik ALTIJD dit pad voor geografische filtering:
@@ -50,6 +63,145 @@ Dit geldt voor:
 - sfWithin of sfIntersects waarbij de archeologische dataset niet op woonplaats of gemeente gefilterd kan worden
 - Vragen als "welke archeologische gebieden overlappen met rijksmonumenten in Gelderland/Nederland"
 
+RIJKSMONUMENT EN ARCHEOLOGISCH ONDERZOEKSGEBIED KOPPELEN OP KERNNIVEAU
+(snel alternatief voor zware ruimtelijke joins zoals sfIntersects/sfWithin):
+
+Rijksmonumenten en archeologische onderzoeksgebieden hebben BEIDE een kernnaam
+(geen gemeentenaam) beschikbaar:
+- Rijksmonument: ceo:heeftLocatieAanduiding -> ceo:locatienaam
+- ArcheologischOnderzoeksgebied: ceo:heeftBasisregistratieRelatie -> heeftBAGRelatie -> ceo:woonplaatsnaam
+
+Voor vragen als "welk archeologisch gebied ligt er onder een rijksmonument in <plaats>"
+gebruik je deze SNELLE aanpak via naam-matching in plaats van een ruimtelijke join:
+
+SELECT DISTINCT ?rm ?onderzoeksgebied ?wkt ?archeWkt WHERE {
+  ?rm a ceo:Rijksmonument .
+  ?rm ceo:heeftLocatieAanduiding ?locatie .
+  ?locatie ceo:locatienaam ?locatienaam .
+  FILTER(CONTAINS(LCASE(?locatienaam), "werkhoven"))
+  OPTIONAL { ?rm ceo:heeftGeometrie ?rmGeom . ?rmGeom geo:asWKT ?wkt . }
+
+  ?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
+  ?onderzoeksgebied ceo:heeftBasisregistratieRelatie ?brr .
+  ?brr ceo:heeftBAGRelatie ?bag .
+  ?bag ceo:woonplaatsnaam ?woonplaats .
+  FILTER(CONTAINS(LCASE(?woonplaats), "werkhoven"))
+  OPTIONAL { ?onderzoeksgebied ceo:heeftGeometrie ?og . ?og geo:asWKT ?archeWkt . }
+}
+
+LET OP: dit geeft alle rijksmonumenten EN onderzoeksgebieden in dezelfde kern terug
+(een benadering — "in dezelfde plaats", niet "exact ruimtelijk overlappend"). Vermeld dit
+verschil niet in de query zelf maar besef dat dit sneller is dan een echte ruimtelijke join
+en in de praktijk een goede indicatie geeft welke objecten in elkaars buurt liggen.
+
+Gebruik deze aanpak bij voorkeur over geof:sfIntersects/sfWithin wanneer de vraag een
+specifieke kern of plaatsnaam noemt (niet een hele provincie/gemeente) — dat voorkomt
+timeouts en topologiefouten volledig.
+
+LOCATIE/KERN VAN EEN RIJKSMONUMENT (plaatsnaam, NIET gemeentenaam):
+ceo:heeftBasisregistratieRelatie -> heeftBAGRelatie -> ceo:woonplaatsnaam geeft de
+GEMEENTENAAM terug (bijv. "Bunnik"), NIET de specifieke kern/plaats (bijv. "Werkhoven").
+
+Voor een specifieke kern of plaatsnaam (zoals een dorp binnen een gemeente) gebruik je:
+?rm ceo:heeftLocatieAanduiding ?locatie .
+?locatie ceo:locatienaam ?locatienaam .
+FILTER(CONTAINS(LCASE(?locatienaam), "werkhoven"))
+Voeg ?locatienaam ALTIJD toe aan de SELECT, zodat de kernnaam zichtbaar is in de resultaten.
+
+Voeg ALTIJD ook de bijbehorende gemeente toe als extra context-veld, zodat de gebruiker
+ziet in welke gemeente de kern ligt. Gebruik de OFFICIËLE heeftGemeente-relatie (URI),
+NOOIT ceo:gemeentenaam via BRK (die kan een andere/onbetrouwbare waarde geven):
+OPTIONAL {
+  ?rm ceo:heeftBasisregistratieRelatie ?relatieGemeente .
+  ?relatieGemeente ceo:heeftGemeente ?gemeenteUri .
+  ?gemeenteUri rdfs:label ?gemeente .
+}
+Voeg ?gemeente ook toe aan de SELECT. Voeg PREFIX rdfs: toe indien nog niet aanwezig.
+
+Gebruik dit pad wanneer de gevraagde plaats een kleine kern/dorp is dat WEL een eigen naam
+heeft maar GEEN eigen gemeente is (bijv. Werkhoven, Odijk, Cothen zijn kernen binnen
+gemeente Bunnik/Wijk bij Duurstede). Gebruik de normale heeftGemeente-route (via de
+GEMEENTE_URI mapping) wanneer de gevraagde plaats zelf een gemeente is (bijv. Utrecht,
+Amsterdam, Deventer).
+
+OPPERVLAKTE BIJ ANDERE KLASSEN (Rijksmonument, ArcheologischOnderzoeksgebied, etc.):
+Virtuoso ondersteunt GEEN oppervlakteberekening in SPARQL (geof:area en bif:st_area
+bestaan niet). De applicatie berekent de oppervlakte ZELF in Python uit de WKT-geometrie,
+NA het ophalen van de resultaten.
+
+Dit betekent: voor oppervlaktevragen bij klassen ZONDER kant-en-klare attributen
+(dus niet Werelderfgoed/Gezicht), haal je ALTIJD de WKT op via ?wkt, maar voeg je
+GEEN FILTER toe op oppervlakte in de SPARQL-query zelf — dat kan niet. Filtering op
+oppervlakte (zoals "groter dan 1 km²") gebeurt automatisch ACHTERAF in de applicatie,
+na de Python-berekening. Haal dus gewoon alle objecten op die aan de overige
+voorwaarden voldoen (locatie/type), inclusief hun WKT.
+
+Als de vraag een oppervlakte-DREMPELWAARDE bevat (groter/kleiner/meer/minder dan X
+km² of hectare), voeg dan een SPECIALE COMMENTAARREGEL toe direct na de eerste regel
+van de query, in dit exacte formaat (de applicatie leest dit uit, het is geen geldige
+SPARQL-comment-syntax voor het endpoint maar wordt er vóór verzending automatisch
+uitgefilterd):
+# OPPERVLAKTE_FILTER: operator=GROTER waarde=1.0 eenheid=km2
+of
+# OPPERVLAKTE_FILTER: operator=KLEINER waarde=50 eenheid=ha
+
+operator is GROTER of KLEINER, waarde is een getal, eenheid is km2 of ha.
+Voeg deze regel NIET toe als er geen drempelwaarde in de vraag staat.
+
+Voorbeeld — "archeologische onderzoeksgebieden in Drenthe groter dan 1 km²":
+# OPPERVLAKTE_FILTER: operator=GROTER waarde=1.0 eenheid=km2
+SELECT DISTINCT ?onderzoeksgebied ?wkt WHERE {
+  ?onderzoeksgebied a ceo:ArcheologischOnderzoeksgebied .
+  ?onderzoeksgebied ceo:heeftBasisregistratieRelatie ?brr .
+  ?brr ceo:heeftBAGRelatie ?bag .
+  ?bag ceo:woonplaatsnaam ?woonplaats .
+  GRAPH <https://linkeddata.cultureelerfgoed.nl/rce/cho/graphs/cbs_woonplaatsen> {
+    ?wp cbs:woonplaatsnaam ?woonplaats .
+    ?wp cbs:inProvincie <OWMS_PROVINCIE_URI> .
+  }
+  OPTIONAL { ?onderzoeksgebied ceo:heeftGeometrie ?geom . ?geom geo:asWKT ?wkt . }
+}
+(GEEN FILTER op oppervlakte in de SPARQL WHERE-clause zelf — alleen de
+OPPERVLAKTE_FILTER commentaarregel. De applicatie berekent en filtert dit na ontvangst.)
+
+OPPERVLAKTE BIJ WERELDERFGOED EN GEZICHT — gebruik ALTIJD de directe attributen,
+NOOIT een geo-functie/berekening (dat is veel trager):
+
+ceo:Geometrie heeft twee kant-en-klare oppervlaktewaarden:
+- ceo:oppervlakteInHectare
+- ceo:oppervlakteInVierkanteKilometers
+
+Dit is ALLEEN beschikbaar bij ceo:Werelderfgoed en ceo:Gezicht (niet bij Rijksmonument
+of ArcheologischOnderzoeksgebied).
+
+Bij elke vraag over oppervlakte als WAARDE (niet als ruimtelijk filter zoals "binnen"/"overlapt"),
+voeg ALTIJD beide eenheden toe aan de SELECT:
+
+?obj ceo:heeftGeometrie ?geom .
+?geom ceo:oppervlakteInHectare ?oppervlakteHa .
+?geom ceo:oppervlakteInVierkanteKilometers ?oppervlakteKm2 .
+
+Voor vergelijkingen (groter/kleiner dan X) gebruik je een FILTER direct op deze waarde,
+bijvoorbeeld FILTER(?oppervlakteHa > 50). Gebruik NOOIT geof:area of een berekening op
+de WKT-geometrie wanneer deze directe attributen beschikbaar zijn — dat is significant
+trager en onnodig.
+
+NAAM VAN EEN GEZICHT — gebruik ALTIJD dit pad, NOOIT rdfs:label (een Gezicht
+heeft geen rdfs:label, gebruik daarvan veroorzaakt dat de query 0 resultaten geeft
+omdat het een VERPLICHTE triple is, geen OPTIONAL):
+?gezicht ceo:heeftNaam ?naamObj . ?naamObj ceo:naam ?gezichtNaam .
+Gebruik dit ALLEEN binnen een OPTIONAL{} blok als je de naam alleen ter informatie
+ophaalt, NOOIT als verplichte triple buiten OPTIONAL — anders faalt de hele query
+zodra die triple niet matcht. rdfs:label is uitsluitend bedoeld voor GEMEENTE/PROVINCIE
+URI's (bijv. ?gemeenteUri rdfs:label ?gemeente), niet voor Gezicht of Rijksmonument.
+
+GEOMETRIE MET MEERDERE WKT-WAARDEN PER OBJECT: een ceo:Geometrie object kan
+MEERDERE geo:asWKT waarden hebben (bijv. zowel een POINT als een POLYGON/MULTIPOLYGON
+voor representatief punt vs. exacte contour). Gebruik gewoon het standaard
+OPTIONAL-patroon (?rm ceo:heeftGeometrie ?geom . ?geom geo:asWKT ?wkt .) zonder
+filter op het geometrietype — de applicatie kiest ZELF automatisch de meest
+informatieve variant (polygoon boven punt) bij het verwerken van de resultaten.
+
 RUIMTELIJKE QUERIES — geof:sfWithin is toegestaan maar ALLEEN efficiënt als je eerst filtert:
 
 Bij vragen over monumenten binnen een gezicht: selecteer ALTIJD ook ?gezichtWkt zodat het gezicht als polygoon op de kaart verschijnt:
@@ -66,22 +218,33 @@ SELECT DISTINCT ?rm ?nummer ?naam ?wkt ?gezichtWkt WHERE {
 }
 
 
-VERPLICHTE VOLGORDE bij ruimtelijke queries:
-1. Als je filtert op een GEZICHT: gebruik het gezichtspolygoon als enige filter — voeg GEEN gemeente of provincie filter toe
-2. Als je filtert op een willekeurig gebied ZONDER gezicht: filter eerst op gemeente of provincie, dan pas geof:sfWithin
+VERPLICHTE VOLGORDE bij ruimtelijke queries — ALTIJD een gemeente- of provincie-voorfilter
+op de andere dataset (de dataset waar je NIET op filtert via URI), anders timeout:
 
-Goed — eerst gemeente filter, dan ruimtelijk:
+1. Filter op GEZICHT (via URI) + monumenten binnen dat gezicht:
+   Het gezicht zelf heeft al een vaste locatie (de URI bepaalt dat), maar de RIJKSMONUMENTEN
+   moeten ALTIJD ook een gemeente-voorfilter krijgen (dezelfde gemeente als het gezicht),
+   anders scant de sfWithin-join alle rijksmonumenten in Nederland.
+   Voeg GEEN extra gemeentefilter toe op het gezicht zelf (dat is overbodig, de URI is al specifiek).
+
+2. Filter op willekeurig gebied ZONDER gezicht-URI: filter beide datasets op gemeente of provincie.
+
+Goed — gezicht-URI + gemeente-voorfilter op de rijksmonumenten, dan ruimtelijk:
+?gezicht a ceo:Gezicht .
+FILTER(?gezicht = <https://...gezicht/10134270>)
+?gezicht ceo:heeftGeometrie ?gGeom . ?gGeom geo:asWKT ?gWkt .
 ?rm a ceo:Rijksmonument .
 ?rm ceo:heeftBasisregistratieRelatie ?brr .
 ?brr ceo:heeftGemeente <http://standaarden.overheid.nl/owms/terms/Deventer_(gemeente)> .
-?rm ceo:heeftGeometrie ?rmGeom . ?rmGeom gsp:asWKT ?rmWkt .
-<https://...gezicht/10134270> ceo:heeftGeometrie ?gGeom . ?gGeom gsp:asWKT ?gWkt .
+?rm ceo:heeftGeometrie ?rmGeom . ?rmGeom geo:asWKT ?rmWkt .
 FILTER(geof:sfWithin(?rmWkt, ?gWkt))
 
-Fout — geen voorfilter, scant alle monumenten:
+Fout — gezicht-URI zonder gemeente-voorfilter op de rijksmonumenten, scant alle monumenten in Nederland:
+?gezicht a ceo:Gezicht .
+FILTER(?gezicht = <https://...gezicht/10134270>)
+?gezicht ceo:heeftGeometrie ?gGeom . ?gGeom geo:asWKT ?gWkt .
 ?rm a ceo:Rijksmonument .
-?rm ceo:heeftGeometrie ?rmGeom . ?rmGeom gsp:asWKT ?rmWkt .
-?gezicht ceo:heeftGeometrie ?gGeom . ?gGeom gsp:asWKT ?gWkt .
+?rm ceo:heeftGeometrie ?rmGeom . ?rmGeom geo:asWKT ?rmWkt .
 FILTER(geof:sfWithin(?rmWkt, ?gWkt))
 
 Benodigde prefixen bij ruimtelijke queries:
