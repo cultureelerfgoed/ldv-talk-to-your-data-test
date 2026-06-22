@@ -37,6 +37,13 @@ Gebruik NOOIT:
 - heeftGemeente (bestaat niet bij onderzoeksgebieden)
 - heeftProvincie (bestaat niet bij onderzoeksgebieden)
 
+RIJKSMONUMENT EN PROVINCIE:
+ceo:Rijksmonument heeft WEL een directe provincie-koppeling:
+?rm ceo:heeftBasisregistratieRelatie ?brr .
+?brr ceo:heeftProvincie <OWMS_PROVINCIE_URI> .
+Gebruik NOOIT de CBS-graph voor rijksmonumenten — die is uitsluitend bedoeld
+voor archeologische onderzoeksgebieden.
+
 ARCHEOLOGISCHE ONDERZOEKSGEBIEDEN EN PROVINCIE:
 ceo:ArcheologischOnderzoeksgebied heeft GEEN heeftProvincie.
 Gebruik de CBS woonplaatsen graph voor de provincie-koppeling:
