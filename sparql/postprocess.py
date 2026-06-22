@@ -30,6 +30,14 @@ def inject_prefixes(query: str) -> str:
         query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" + query
     if "PREFIX cbs:" not in query and "cbs:" in query:
         query = "PREFIX cbs: <https://opendata.cbs.nl/woonplaatsen/>\n" + query
+    # Vervang altijd een foutieve rn:-prefix (zonder /2/) door de correcte versie.
+    # Het LLM genereert soms PREFIX rn: <.../rn/> (zonder /2/), waarna
+    # rn:b2d9a59a-... ongeldige SPARQL-syntax is.
+    if "PREFIX rn: <https://data.cultureelerfgoed.nl/term/id/rn/>" in query and        "PREFIX rn: <https://data.cultureelerfgoed.nl/term/id/rn/2/>" not in query:
+        query = query.replace(
+            "PREFIX rn: <https://data.cultureelerfgoed.nl/term/id/rn/>",
+            "PREFIX rn: <https://data.cultureelerfgoed.nl/term/id/rn/2/>"
+        )
     if "PREFIX rn:" not in query and "rn:" in query:
         query = "PREFIX rn: <https://data.cultureelerfgoed.nl/term/id/rn/2/>\n" + query
     return query
