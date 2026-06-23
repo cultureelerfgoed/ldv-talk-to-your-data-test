@@ -413,6 +413,32 @@ def normalize_gemeente_uri(query: str) -> str:
         query,
         count=1
     )
+
+    # Voeg gemeentenaam toe als leesbare variabele via rdfs:label, zodat
+    # ?gemeente zichtbaar blijft in de resultaten (de FILTER is nu een vaste
+    # URI, geen CONTAINS-stringvariabele meer, dus ?gemeente zou anders leeg zijn).
+    if "PREFIX rdfs:" not in query:
+        query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n" + query
+
+    apostrof = "'"
+    label_block = (
+        "\n  OPTIONAL {\n"
+        "    <" + uri + "> rdfs:label ?gemeente .\n"
+        '    FILTER(!CONTAINS(?gemeente, "' + apostrof + '"))\n'
+        "  }"
+    )
+    query = re.sub(r'(\n}\s*\nLIMIT|\n}\s*$)', label_block + r'\1', query, count=1)
+
+    # Zorg dat ?gemeente in de SELECT staat
+    select_match = re.search(r"SELECT\s+(?:DISTINCT\s+)?((?:\?\w+\s*)+)", query, re.IGNORECASE)
+    if select_match and "?gemeente" not in select_match.group(0):
+        query = re.sub(
+            r"(SELECT\s+(?:DISTINCT\s+)?)((?:\?\w+\s*)+)",
+            lambda m: m.group(1) + m.group(2).rstrip() + " ?gemeente ",
+            query,
+            count=1,
+        )
+
     return query
 
 

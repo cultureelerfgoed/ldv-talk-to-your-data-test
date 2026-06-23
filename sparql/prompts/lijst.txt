@@ -278,6 +278,22 @@ Fout (breed eerst):
 ?brr ceo:heeftBRKRelatie ?brk .
 ?brk ceo:gemeentenaam ?gemeente . FILTER(...)
 
+GEMEENTE TONEN IN RESULTATEN na URI-normalisatie:
+De backend normaliseert CONTAINS-gemeente-zoekopdrachten naar een directe URI
+(bijv. FILTER(CONTAINS(..., "amsterdam")) → ?brr ceo:heeftGemeente <owms:Amsterdam>).
+Omdat ?gemeente dan geen stringvariabele meer is maar een vaste URI, zou de kolom
+leeg zijn. Voeg ALTIJD een rdfs:label lookup toe zodat de gemeentenaam leesbaar
+in de resultaten verschijnt:
+
+OPTIONAL {
+  <gemeente-uri> rdfs:label ?gemeente .
+  FILTER(!CONTAINS(?gemeente, "'"))
+}
+
+In de praktijk hoef je dit ZELF niet toe te voegen — de backend doet dit automatisch.
+Maar als je expliciet de gemeente als tekst wilt tonen (bijv. naast een locatienaam),
+gebruik dan dit patroon in plaats van ?brk ceo:gemeentenaam ?gemeente.
+
 
 Genereer een SELECT query die individuele rijksmonumenten teruggeeft, één rij per monument.
 
